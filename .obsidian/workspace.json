@@ -4,21 +4,19 @@
     "type": "split",
     "children": [
       {
-        "id": "f5e6afc93685fcfc",
+        "id": "4a6ece46127f4720",
         "type": "tabs",
         "children": [
           {
-            "id": "6f7549d5a756e3a0",
+            "id": "faf22e3658d059d5",
             "type": "leaf",
             "state": {
-              "type": "split-diff-view",
+              "type": "excalidraw",
               "state": {
-                "aFile": "renode-use/.obsidian/appearance.json",
-                "bFile": "renode-use/.obsidian/appearance.json",
-                "aRef": ""
+                "file": "Excalidraw/I2C.excalidraw.md"
               },
-              "icon": "diff",
-              "title": "Diff: appearance.json  (Working Tree)"
+              "icon": "excalidraw-icon",
+              "title": "I2C.excalidraw"
             }
           }
         ]
@@ -117,6 +115,7 @@
             "state": {
               "type": "outgoing-link",
               "state": {
+                "file": "Excalidraw/I2C.excalidraw.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               },
@@ -159,6 +158,7 @@
             "state": {
               "type": "outline",
               "state": {
+                "file": "Excalidraw/I2C.excalidraw.md",
                 "followCursor": false,
                 "showSearch": false,
                 "searchQuery": ""
@@ -175,6 +175,16 @@
               "state": {},
               "icon": "git-pull-request",
               "title": "Source Control"
+            }
+          },
+          {
+            "id": "0501486d3021a97c",
+            "type": "leaf",
+            "state": {
+              "type": "smart-connections-view",
+              "state": {},
+              "icon": "smart-connections",
+              "title": "Connections"
             }
           }
         ],
@@ -194,11 +204,26 @@
       "command-palette:打开命令面板": false,
       "bases:新建数据库": false,
       "templater-obsidian:Templater": false,
-      "obsidian-git:Open Git source control": false
+      "obsidian-git:Open Git source control": false,
+      "omnisearch:Omnisearch": false,
+      "table-editor-obsidian:Advanced Tables Toolbar": false,
+      "obsidian-excalidraw-plugin:新建绘图文件": false,
+      "smart-connections:Smart Connections: Open random connection": false,
+      "smart-connections:Smart Connections: Open connections view": false,
+      "smart-connections:Toggle Footer Connections": false
     }
   },
-  "active": "6f7549d5a756e3a0",
+  "active": "faf22e3658d059d5",
   "lastOpenFiles": [
-    "通信协议/I2C.md"
+    "mini-ecology/未命名.base",
+    "mini-ecology/未命名.canvas",
+    "Excalidraw/I2C.excalidraw.md",
+    "通信和外设协议/I2C.md",
+    "通信和外设协议/UART.md",
+    "Excalidraw",
+    "通信和外设协议/协议总览.md",
+    "renode-use/renode用法.md",
+    "renode-use/renode-stm32f4外设和使用.md",
+    "renode-use/database.base"
   ]
 }

@@ -1,4 +1,10 @@
 [
   "templater-obsidian",
-  "obsidian-git"
+  "obsidian-git",
+  "dataview",
+  "obsidian-linter",
+  "omnisearch",
+  "smart-connections",
+  "table-editor-obsidian",
+  "obsidian-excalidraw-plugin"
 ]
