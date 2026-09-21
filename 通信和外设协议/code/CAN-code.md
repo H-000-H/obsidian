@@ -1,10 +1,29 @@
-# CAN 软件模拟（Python）
+---
+title: CAN / CAN-FD 协议软件模拟（Python）完整实现手册
+tags:
+  - Embedded
+  - Protocol
+  - CAN
+  - CANFD
+  - Python
+  - Simulation
+  - BitStuffing
+  - Arbitration
+status: Completed
+created: 2026-09-20
+---
 
-只提供 **Python 软件模拟**，不写 C、不碰晦涩的 CAN 寄存器：CAN 控制器寄存器各家差异极大、时序细节隐蔽，用软件把"总线逻辑 + 位填充 + CRC + 仲裁 + 双速率"在逻辑层建出来，比看寄存器更直观，也方便做仿真与调试。
+# 🐍 CAN / CAN-FD 协议软件模拟（Python）完整实现手册
 
-> 真实硬件收发建议直接使用 `python-can` + `cantools`（DBC 解析）等成熟库对接 CAN / CAN-FD 接口。本文件用于理解协议本身。
+> [!INFO] 笔记概览
+> - **目的**：只提供 **Python 软件模拟**，不写 C、不碰晦涩的 CAN 寄存器。CAN 控制器寄存器各家差异极大、时序细节隐蔽，用软件把"总线逻辑 + 位填充 + CRC + 仲裁 + 双速率"在逻辑层建出来，比看寄存器更直观，也方便仿真调试。
+> - **内容范围**：逻辑位↔物理电平 · CRC-15/17/21 · 位填充 · 数据帧编码 · 总线仲裁模型 · 解码校验 · CAN-FD 编码 · 双速率时序
+> - **推荐路径**：§1 电平 → §2 CRC → §3 位填充 → §4 编码 → §5 仲裁 → §6 解码 → §7 CAN-FD → §8 双速率
+> - **免责声明**：真实硬件收发建议直接用 `python-can` + `cantools`（DBC 解析）对接 CAN / CAN-FD 接口。本文件用于理解协议本身。
 
-整体关系：
+---
+
+## 🗺️ 0. 整体关系
 
 ```text
 数据/配置 (arb, data, BRS, bit rate)
@@ -22,44 +41,40 @@
 
 ---
 
-# 1. 逻辑位与物理电平
+## ⚡ 1. 逻辑位与物理电平
 
 CAN 只有两种电平：**显性 Dominant = 逻辑 0**，**隐性 Recessive = 逻辑 1**。显性覆盖隐性（线与）。
 
 ```python
 def logical_to_level(bit: int):
-    """把逻辑位映射成物理电平.
-    返回: (CAN_H, CAN_L) 两条线的理想电压(V).
-    显性 0 -> CAN_H 高、CAN_L 低；隐性 1 -> 两条线都 2.5V.
+    """把逻辑位映射成物理电平。
+    返回: (CAN_H, CAN_L) 两条线的理想电压(V)。
+    显性 0 -> CAN_H 高、CAN_L 低；隐性 1 -> 两条线都 2.5V。
     """
     if bit == 0:   # dominant
         return (3.5, 1.5)
     return (2.5, 2.5)   # recessive
-```
 
-差分电压：
-
-```python
 def diff_voltage(bit: int) -> float:
+    """差分电压：显性约 2V，隐性约 0V。"""
     return 2.0 if bit == 0 else 0.0
 ```
 
-> 易错点：CAN 的"逻辑 0"是显性、优先级高，和"0 表示空/低"的直觉相反。
+> [!CAUTION] 易错点
+> CAN 的"逻辑 0"是显性、优先级高，和"0 表示空/低"的直觉相反。详见 [[CAN]] §1。
 
 ---
 
-# 2. CRC：普通 CAN 与 CAN-FD
+## 🛡️ 2. CRC：普通 CAN 与 CAN-FD
 
-CRC 都在位级上做，输入是**报文从 SOF 到数据段末尾**这段逻辑位（不含后面的分隔符）。
-
-带一个通用"MSB 先行、输入位从低位进入、检查最高位再异或多项式"的 LFSR 实现：
+CRC 都在位级上做，输入是**报文从 SOF 到数据段末尾**这段逻辑位（不含后面的分隔符）。通用 LFSR 实现（MSB 先行、检查最高位再异或多项式）：
 
 ```python
 def crc_div(bits, poly: int, deg: int) -> int:
     mask = (1 << deg) - 1
     crc = 0
     for b in bits:
-        msb = (crc >> (deg - 1)) & 1   # 最低位? 不，是当前寄存器最高位
+        msb = (crc >> (deg - 1)) & 1   # 移位前寄存器最高位（被移出的一位）
         crc = ((crc << 1) & mask) | (b & 1)
         if msb:
             crc ^= poly
@@ -67,8 +82,7 @@ def crc_div(bits, poly: int, deg: int) -> int:
     return crc
 ```
 
-> 上面 `msb` 是移位**前**寄存器最高位（等于校验运算中被移出的一位），非反射(MSB-first)输入从低位进入。
-> **注意**：以下 CRC 参数按 ISO 11898 常见取值给出，供理解和自测；真实接入前请以目标控制器/参考链路计算结果为准做一次交叉验证。
+三种 CRC 参数（按 ISO 11898 常见取值）：
 
 ```python
 def crc15_can(bits):            # 普通 CAN：poly=0x4599, 无 init, xorout=0x7FFF
@@ -88,15 +102,18 @@ def to_bits(value: int, n: int):
     return [(value >> i) & 1 for i in range(n - 1, -1, -1)]
 ```
 
+> [!WARNING] CRC 参数需交叉验证
+> 上述 CRC 参数按 ISO 11898 常见取值给出，供理解和自测；真实接入前请以目标控制器/参考链路计算结果为准做一次交叉验证。
+
 ---
 
-# 3. 位填充 Stuffing
+## 🔁 3. 位填充 Stuffing
 
 普通 CAN：从 SOF 到 CRC 段每产生连续 5 个相同位，就插 1 个反向位打断，保证总线有足够跳变沿用于重同步。
 
 ```python
 def stamp(bits):
-    """插入填充位：发送每连续 5 个相同位后追加 1 个反向位"""
+    """插入填充位：发送每连续 5 个相同位后追加 1 个反向位。"""
     out = []
     streak = 0
     last = bits[0]
@@ -110,13 +127,11 @@ def stamp(bits):
         if streak == 5:              # 已连续 5 个相同
             out.append(1 - b)        # 插反向位打断
             streak = 0
-            last = 1 - b             # 填充位自身的极性成为新起点
+            last = 1 - b             # 填充位自身极性成为新起点
     return out
-```
 
-```python
 def unstuff(bits):
-    """去填充：连续 5 个相同位后的第 6 位是填充位，跳掉"""
+    """去填充：连续 5 个相同位后的第 6 位是填充位，跳掉。"""
     out = []
     streak = 0
     last = bits[0]
@@ -139,18 +154,17 @@ def unstuff(bits):
     return out
 ```
 
-做一次自检，保证"先填充再去除"能完整还原：
-
-```python
-raw_test = [0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0]
-assert unstuff(stamp(raw_test)) == raw_test
-print("stuff/unstuff round-trip OK,", 
-      "填后", len(stamp(raw_test)), "位, 原", len(raw_test), "位")
-```
+> [!EXAMPLE] 往返自检
+> ```python
+> raw_test = [0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0]
+> assert unstuff(stamp(raw_test)) == raw_test
+> print("stuff/unstuff round-trip OK,",
+>       "填后", len(stamp(raw_test)), "位, 原", len(raw_test), "位")
+> ```
 
 ---
 
-# 4. 普通 CAN：数据帧编码
+## 📤 4. 普通 CAN：数据帧编码
 
 标准帧（11 位 ID）数据帧字段：
 
@@ -158,14 +172,14 @@ print("stuff/unstuff round-trip OK,",
 SOF | Identifier(11) | RTR | IDE | r0 | DLC(4) | Data(0~8B) | CRC(15) | CRC分隔 | ACK槽 | ACK分隔 | EOF(7) | IFS(3)
 ```
 
-编码流程：先拼"参与 CRC 的原始位"，算 CRC，再整体做位填充，再补后续字段。
+编码流程：先拼"参与 CRC 的原始位" → 算 CRC → 整体位填充 → 补后续固定字段。
 
 ```python
 import itertools
 
 
 def classic_data_frame(arb: int, data: bytes):
-    """标准帧 11 位 ID + RTR=0(数据帧) + IDE=0 + r0=0"""
+    """标准帧 11 位 ID + RTR=0(数据帧) + IDE=0 + r0=0。"""
     if not (0x000 <= arb <= 0x7FF):
         raise ValueError("11-bit ID 范围 0x000~0x7FF")
     if len(data) > 8:
@@ -175,7 +189,7 @@ def classic_data_frame(arb: int, data: bytes):
     dlcb = to_bits(len(data), 4)
     datab = list(itertools.chain.from_iterable(to_bits(b, 8) for b in data))
 
-    # SOF + ID + RTR(0) + IDE(0) + r0(0) + DLC + 数据   —— 这整段参与 CRC
+    # SOF + ID + RTR(0) + IDE(0) + r0(0) + DLC + 数据 —— 这整段参与 CRC
     raw = [0] + idb + [0, 0, 0] + dlcb + datab
     crc = crc15_can(raw)
     crcb = to_bits(crc, 15)
@@ -192,40 +206,34 @@ def classic_data_frame(arb: int, data: bytes):
             + [1] * 3)   # IFS
 ```
 
-生成 0x100、2 字节数据的帧并观察填充位前的原序列与填充后总长：
-
-```python
-frame = classic_data_frame(0x100, b"\x01\x02")
-print("填充后帧长(bit):", len(frame))   # 原 ~47 + 填充 + 尾部固定位
-
-# 打印前若干个 bit
-print("".join(map(str, frame[:24])), "...")
-```
-
-> 普通 CAN 最小帧（0 字节数据）：1 + 11 + 3 + 4 + 0 + 15 + 15? —— 以实际运行为准，上面代码会直接给出长度。
+> [!TIP] 观察填充效果
+> ```python
+> frame = classic_data_frame(0x100, b"\x01\x02")
+> print("填充后帧长(bit):", len(frame))
+> print("".join(map(str, frame[:24])), "...")
+> ```
+> 帧长随填充位数变化，以实际运行为准。字段完整定义见 [[CAN]] §4。
 
 ---
 
-# 5. 普通 CAN：总线仲裁模型
+## ⚖️ 5. 普通 CAN：总线仲裁模型
 
 总线是多主"线与"，任意节点发显性(0)即总线显性：
 
 ```python
 def bus_level(offered):
-    """offered: 各节点要发送的位组成的列表；0 显性优先"""
+    """offered: 各节点要发送的位组成的列表；0 显性优先。"""
     return 0 if 0 in offered else 1
-```
 
-仲裁：节点边发边收，**发隐性(1)却读到显性(0) → 失败退出**。
-
-```python
 def arbitrate(frames):
-    """frames: [(节点名, 位列表, 是否已退出)]；返回(赢家名字, 最终帧位序列)"""
+    """frames: [[节点名, 位列表, 是否已退出]]；返回(赢家名字, 最终帧位序列)。
+    节点边发边收，发隐性(1)却读到显性(0) → 失败退出。
+    """
     bits = len(frames[0][1])
     result = []
     for i in range(bits):
         fade = [f for f in frames if not f[2]]        # 仍未退出的活节点
-        won_bit = bus_level([f[1][i] for f in fade])  # 总线被谁拉成什么电平
+        won_bit = bus_level([f[1][i] for f in fade])  # 总线被拉成什么电平
         result.append(won_bit)
         for f in fade:
             if f[1][i] == 1 and won_bit == 0:         # 我发隐性，总线却显性
@@ -234,28 +242,22 @@ def arbitrate(frames):
     return winner[0], result
 ```
 
-完整示例：两节点同发，ID 小者优先。
-
-```python
-n_a = ("A(id=0x100)", classic_data_frame(0x100, b"\x01"))
-n_b = ("B(id=0x0FF)", classic_data_frame(0x0FF, b"\x02"))
-
-frames = [[name, f, False] for name, f in (n_a, n_b)]
-winner, bus_seq = arbitrate(frames)
-
-print("赢得总线:", winner)
-print("总线前 16 位:", "".join(map(str, bus_seq[:16])))
-```
-
-> ID 越小 → 高位显性越早出现 → 优先级越高。`0x0FF < 0x100`，B 胜出。
+> [!EXAMPLE] 两节点同发，ID 小者优先
+> ```python
+> n_a = ("A(id=0x100)", classic_data_frame(0x100, b"\x01"))
+> n_b = ("B(id=0x0FF)", classic_data_frame(0x0FF, b"\x02"))
+> frames = [[name, f, False] for name, f in (n_a, n_b)]
+> winner, bus_seq = arbitrate(frames)
+> print("赢得总线:", winner)
+> print("总线前 16 位:", "".join(map(str, bus_seq[:16])))
+> ```
+> ID 越小 → 高位显性越早出现 → 优先级越高。`0x0FF < 0x100`，B 胜出。仲裁原理见 [[CAN]] §3。
 
 ---
 
-# 6. 接收 / 解码与校验
+## 📥 6. 接收 / 解码与校验
 
-解码是编码逆过程：去填充 → 校验 CRC → 拆字段。为让代码可运行，这里按标准帧（11 位 ID、数据帧、含固定尾部）固定字段长度做解析。
-
-字段布局（长度固定，除了数据段长度由 DLC 决定）：
+解码是编码逆过程：去填充 → 校验 CRC → 拆字段。按标准帧固定字段长度解析：
 
 ```python
 # 发送端顺序（编码时已确定）:
@@ -271,17 +273,14 @@ ACK_DELIM = 1
 EOF = 7
 IFS = 3
 TAIL = CRC_DELIM + ACK_SLOT + ACK_DELIM + EOF + IFS   # 不参与 CRC/去填充的尾部
-```
 
 
-```python
 def to_int(bits):
     v = 0
     for b in bits:
         v = (v << 1) | b
     return v
 ```
-
 
 ```python
 from collections import namedtuple
@@ -290,17 +289,15 @@ Parsed = namedtuple("Parsed", ["id", "dlc", "data", "crc_ok"])
 
 
 def parse_classic(frame: list):
-    """解析普通 CAN 标准帧（已含全部填充与尾部）。
-    frame: 编码器输出的 bit 列表。
-    """
-    # 1) 尾部是固定字段（CRC分隔 + ACK槽 + ACK分隔 + EOF + IFS），先剥掉
+    """解析普通 CAN 标准帧（已含全部填充与尾部）。"""
+    # 1) 尾部是固定字段，先剥掉
     stuffed_len = len(frame) - TAIL
     stuffed_body = frame[:stuffed_len]
 
     # 2) 去填充 → 得到原始位（含 CRC 位）
     raw = unstuff(stuffed_body)
 
-    # 3) 数据长度由 DLC 确定（DLC 从 BEFORE_DLC 位开始）
+    # 3) 数据长度由 DLC 确定
     dlc = to_int(raw[DLC_AT:DLC_AT + 4])
     data_start = DLC_AT + 4
     data_end = data_start + dlc * 8
@@ -329,19 +326,22 @@ def parse_demo():
 parse_demo()   # 期望: ID=0x100 dlc=2 data=[1, 2] crc_ok=True
 ```
 
+> [!NOTE] CRC 不符的排查
 > 去填充后 `raw[:data_end]` 正是算 CRC 的字段；与收到的 15 位 CRC 比对即可。若 CRC 不符，多半是位填充边界对不上（真实控制器会对填充错误直接报错误帧）。
 
 ---
 
-# 7. CAN-FD：编码（FDF / BRS / ESI / DLC 映射）
+## 🚀 7. CAN-FD：编码（FDF / BRS / ESI / DLC 映射）
 
 CAN-FD 相比经典多了：
 
-- **FDF=1（隐性）** 标记 FD 帧，替换经典 r0；
-- **res** 保留位（FD 为隐性 1）；
-- **BRS**：1 → 数据段提速；
-- **ESI**：发送方错误被动时显性，否则隐性；
-- **DLC 扩展映射**：9~15 → 12/16/20/24/32/48/64 字节。
+| 特性 | 说明 |
+| :--- | :--- |
+| **FDF=1（隐性）** | 标记 FD 帧，替换经典 r0 |
+| **res** | 保留位（FD 为隐性 1） |
+| **BRS** | 1 → 数据段提速 |
+| **ESI** | 发送方错误被动时显性，否则隐性 |
+| **DLC 扩展映射** | 9~15 → 12/16/20/24/32/48/64 字节 |
 
 ```python
 FD_DLC_MAP = {
@@ -360,26 +360,24 @@ def fd_dlc_for_length(n: int) -> int:
 
 
 def canfd_data_frame(arb: int, data: bytes, brs: bool = True, esi: bool = False):
-    """CAN-FD 扩展帧思路（仅 11 位 ID 主段示例，不展开完整 29 位）。"""
+    """CAN-FD 帧思路（仅 11 位 ID 主段示例，不展开完整 29 位）。
+    返回三段 (control, data_phase, tail)，便于按 nominal/data 两种位速率分别计时。
+    """
     if len(data) > 64:
         raise ValueError("CAN-FD 最多 64 字节")
     dlc = fd_dlc_for_length(len(data))
     datab = list(itertools.chain.from_iterable(to_bits(b, 8) for b in data))
 
-    # 仲裁/控制段参与 CRC 的原始位
+    # 仲裁/控制段参与 CRC 的原始位:
     #  SOF + ID(11) + FDF(1) + res(1) + BRS(1) + ESI(1) + DLC(4)
     raw = [0] + to_bits(arb, 11) + [1, 1] + [1 if brs else 0, 1 if esi else 0] + to_bits(dlc, 4)
 
     # 数据段：数据 + CRC。CRC 按长度选 17/21
     crc_field_len = 17 if len(data) <= 16 else 21
     raw_for_crc = raw + datab
-    if crc_field_len == 17:
-        crc = crc17_fd(raw_for_crc)
-    else:
-        crc = crc21_fd(raw_for_crc)
+    crc = crc17_fd(raw_for_crc) if crc_field_len == 17 else crc21_fd(raw_for_crc)
     crcb = to_bits(crc, crc_field_len)
 
-    # 打好相位标记：仲裁段(bits)为 nominal，数据段为 data（用于下面第 8 节做双速率时序）
     control = raw + datab                # 还在仲裁速率
     data_phase = crcb                    # CAN-FD 数据段（数据+CRC 在数据速率）
     tail = [1] + [0] + [1] + [1] * 7 + [1] * 3   # CRC分隔 + ACK槽 + ACK分隔 + EOF + IFS
@@ -387,11 +385,12 @@ def canfd_data_frame(arb: int, data: bytes, brs: bool = True, esi: bool = False)
     return control, data_phase, tail
 ```
 
-> 说明：`canfd_data_frame` 返回三段，便于第 8 节按 nominal / data 两种位速率分别计时间。真正的完整 FD 帧还需把"数据"也计入数据段——本函数把控制段与数据段分开返回，课时目的已达。
+> [!NOTE] 分段返回的用意
+> `canfd_data_frame` 返回三段，便于 §8 按 nominal / data 两种位速率分别计时间。DLC 映射表与 CAN-FD 完整字段见 [[CAN]] §6、§8。
 
 ---
 
-# 8. CAN-FD：双速率时序模拟
+## ⏱️ 8. CAN-FD：双速率时序模拟
 
 给每个 bit 按所处相位决定它的时长：
 
@@ -400,7 +399,7 @@ def fd_timeline(control, data_phase, tail,
                 t_nominal_us=2.0,     # 500 kbit/s -> 2.0 us/bit
                 t_data_us=0.2,        # 5 Mbit/s   -> 0.2 us/bit
                 sample_nominal=0.75): # 采样点位置（比例）
-    events = []          # (时刻, 电平)
+    events = []          # (起始, 结束, 相位, 电平)
     phases = [("nominal", 0) for _ in control]
     phases += [("data", 0) for _ in data_phase]
     phases += [("nominal", 0) for _ in tail]
@@ -414,17 +413,15 @@ def fd_timeline(control, data_phase, tail,
     return events
 ```
 
-打印每个 bit 的时长，直观看到 BRS 之后数据段明显"更窄更快"，最后 ACK/EOF 又回到 nominal：
+打印每个 bit 时长，直观看到 BRS 之后数据段明显"更窄更快"，最后 ACK/EOF 又回到 nominal：
 
 ```python
 control, data_phase, tail = canfd_data_frame(0x100, bytes(8), brs=True)
 tl = fd_timeline(control, data_phase, tail)
 
 print("段 | 时长(us) | 电平")
-count = 0
-for start, end, kind, b in tl:
+for count, (start, end, kind, b) in enumerate(tl):
     print(f"{kind:8s} | {end-start:.2f} | {b}")
-    count += 1
     if count > 28:
         break
 ```
@@ -433,7 +430,7 @@ for start, end, kind, b in tl:
 
 ---
 
-# 9. 汇总对比（模拟里体现的差异）
+## 🆚 9. 汇总对比（模拟里体现的差异）
 
 | 项目 | 普通 CAN | CAN-FD |
 | :-- | :-- | :-- |
@@ -444,3 +441,35 @@ for start, end, kind, b in tl:
 | 远程帧 | 支持 | 不支持 |
 
 ---
+
+## ✅ 落地校验清单（Checklist）
+
+> [!SUCCESS] 运行本模拟代码前必过
+> - [ ] **电平映射**：显性=逻辑 0=优先级高，勿与直觉混淆
+> - [ ] **位填充往返**：`unstuff(stamp(x)) == x` 自检通过
+> - [ ] **CRC 范围**：SOF 到数据段末尾（不含分隔符）
+> - [ ] **CRC 选择**：FD ≤16B 用 CRC-17，>16B 用 CRC-21
+> - [ ] **仲裁模型**：发隐性读到显性即失败退出，ID 小者胜
+> - [ ] **解码对齐**：先剥固定尾部 → 去填充 → 按 DLC 取数据
+> - [ ] **DLC 映射**：FD 长度 9~64 用 `fd_dlc_for_length`
+> - [ ] **双速率**：数据段用 `t_data_us`，ACK/EOF 回 `t_nominal_us`
+> - [ ] **参数验证**：真实接入前用目标控制器交叉验证 CRC
+
+---
+
+## 🔗 思考与延伸索引
+
+- [[CAN]] — CAN / CAN-FD 协议层总览：物理层、仲裁、帧格式、错误状态机
+- [[Modbus-code]] — 另一种协议的 Python 软件模拟对照
+- [[SPI-code]] — SPI 的软件模拟实现
+- [[UART-code]] — UART 帧编解码的软件模拟
+- [[嵌入式内核]] — 真实 CAN 控制器驱动中的位时序与错误处理
+
+---
+
+## 📚 参考资料
+
+1. **Bosch** — *CAN Specification Version 2.0*, 1991.
+2. **Bosch** — *CAN with Flexible Data-Rate Specification Version 1.2*, 2012.
+3. **ISO** — *ISO 11898-1: CAN — Data link layer and physical signalling*.
+4. **Python** — `python-can`、`cantools` 官方文档.

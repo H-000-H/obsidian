@@ -1,10 +1,29 @@
-# Modbus 软件模拟（Python）
+---
+title: Modbus 协议软件模拟（Python）完整实现手册
+tags:
+  - Embedded
+  - Protocol
+  - Modbus
+  - ModbusRTU
+  - ModbusTCP
+  - Python
+  - Simulation
+  - CRC16
+status: Completed
+created: 2026-09-20
+---
 
-用 **Python 软件模拟**把 Modbus 的 RTU / ASCII / TCP 帧、CRC-16/MODBUS、LRC、异常应答在逻辑层建出来，方便理解"主→从一问一答"的时序和帧格式，也便于做仿真与调试。
+# 🐍 Modbus 协议软件模拟（Python）完整实现手册
 
-> 真实对接设备建议直接用宿主库，如串口用 `pyserial`，Modbus 用 `pymodbus`。本文件用于理解协议本身。
+> [!INFO] 笔记概览
+> - **目的**：用 **Python 软件模拟**把 RTU / ASCII / TCP 帧、CRC-16/MODBUS、LRC、异常应答在逻辑层建出来，理解"主→从一问一答"时序与帧格式，便于仿真调试。
+> - **内容范围**：CRC/LRC 校验 · RTU 帧编解码 · 功能码打包 · 异常应答 · ASCII 模式 · TCP MBAP · 主从一问一答 · 超时重试
+> - **推荐路径**：§1 校验 → §2 RTU 帧 → §3 功能码 → §4 异常 → §5 ASCII → §6 TCP → §7 主从示例 → §8 时序
+> - **免责声明**：真实对接设备建议直接用宿主库（串口 `pyserial`、Modbus `pymodbus`），本文件用于理解协议本身。
 
-整体关系：
+---
+
+## 🗺️ 0. 整体关系
 
 ```text
 主站请求(功能码+数据)
@@ -20,13 +39,13 @@
 
 ---
 
-# 1. CRC-16/MODBUS 与 LRC
+## 🛡️ 1. CRC-16/MODBUS 与 LRC
 
-RTU 用 **CRC-16/MODBUS**：多项式 `0x8005` 反映射即 `0xA001`，初值 `0xFFFF`，先发低字节再发高字节。
+RTU 用 **CRC-16/MODBUS**：多项式 `0x8005` 反映射即 `0xA001`，初值 `0xFFFF`，**先发低字节再发高字节**。
 
 ```python
 def crc16_modbus(data):
-    """对字节序列计算 CRC-16/MODBUS，返回 (完整16位值)。"""
+    """对字节序列计算 CRC-16/MODBUS，返回完整 16 位值。"""
     crc = 0xFFFF
     for b in data:
         crc ^= b
@@ -45,21 +64,21 @@ LRC 用于 **ASCII** 模式，是各字节和的补码，只取低 8 位：
 ```python
 def lrc(data):
     total = sum(data) & 0xFF
-    return (-total) & 0xFF          # 补码：对 low 8 位取反加一
+    return (-total) & 0xFF          # 补码：对低 8 位取反加一
 ```
 
-自检：
-
-```python
-assert crc16_modbus([0x01, 0x03, 0x00, 0x00, 0x00, 0x02]) == 0x0BC4  # 帧尾 C4 0B
-assert lrc([0x01, 0x03, 0x00, 0x00, 0x00, 0x02]) == 0xFA
-```
+> [!EXAMPLE] 校验自检
+> ```python
+> assert crc16_modbus([0x01, 0x03, 0x00, 0x00, 0x00, 0x02]) == 0x0BC4  # 帧尾 C4 0B
+> assert lrc([0x01, 0x03, 0x00, 0x00, 0x00, 0x02]) == 0xFA
+> ```
+> CRC 完整算法剖析与更多测试向量见 [[modbus]] §4、协议层字节序规则见 [[Modbus]] §6。
 
 ---
 
-# 2. RTU 帧：构造与解析
+## 📦 2. RTU 帧：构造与解析
 
-RTU 帧 = `地址 | 功能码 | 数据 | CRC低 | CRC高`。地址 0 是广播。
+RTU 帧 = `地址 | 功能码 | 数据 | CRC低 | CRC高`，地址 0 是广播。
 
 ```python
 def build_rtu(slave: int, func: int, data=b""):
@@ -68,7 +87,7 @@ def build_rtu(slave: int, func: int, data=b""):
     return body + bytes(crc_bytes(body))
 
 def parse_rtu(frame: bytes):
-    """解析 RTU 帧；地址不符或 CRC 错返回 None。校验失败返回 ('badcrc', ...)。"""
+    """解析 RTU 帧；地址不符或 CRC 错返回 None。"""
     if len(frame) < 4:
         return None
     slave, func = frame[0], frame[1]
@@ -78,18 +97,18 @@ def parse_rtu(frame: bytes):
     return {"slave": slave, "func": func, "data": payload}
 ```
 
-数据区里 16 位数量、地址都用**大端**（高字节在前）：
-
-```python
-def u16(v):
-    return [ (v >> 8) & 0xFF, v & 0xFF ]
-```
+> [!NOTE] 数据区字节序
+> 数据区里 16 位数量、地址都用**大端**（高字节在前），与 CRC 的小端相反：
+> ```python
+> def u16(v):
+>     return [(v >> 8) & 0xFF, v & 0xFF]
+> ```
 
 ---
 
-# 3. 常用功能码数据打包
+## 🔢 3. 常用功能码数据打包
 
-## 3.1 读保持寄存器（0x03）
+### 3.1 读保持寄存器（0x03）
 
 请求 = `起始寄存器(2B) + 数量(2B)`；应答 = `字节数(1B) + 寄存器值(2B × n)`（寄存器本身大端）。
 
@@ -105,7 +124,7 @@ def read_holding_response(slave, values):
     return build_rtu(slave, 0x03, data)
 ```
 
-## 3.2 写单寄存器（0x06）
+### 3.2 写单寄存器（0x06）
 
 请求 = `寄存器地址(2B) + 值(2B)`；应答**原样回显**请求。
 
@@ -114,7 +133,7 @@ def write_single_register(slave, reg, value):
     return build_rtu(slave, 0x06, u16(reg) + u16(value))
 ```
 
-## 3.3 读线圈（0x01）
+### 3.3 读线圈（0x01）
 
 应答把连续 bit 按位打包成字节，最后一个字节高位补 0。
 
@@ -134,30 +153,32 @@ def coil_pack(bits):
     return out
 
 def read_coil_response(slave, bits):
-    return build_rtu(slave, 0x01, bytes([len(coil_pack(bits))]) + bytes(coil_pack(bits)))
+    packed = coil_pack(bits)
+    return build_rtu(slave, 0x01, bytes([len(packed)]) + bytes(packed))
 ```
 
 ---
 
-# 4. 异常应答
+## ⚠️ 4. 异常应答
 
 从站无法完成时，回功能码 **+0x80** 再加 1 字节异常码。
 
 ```python
-EX_BAD_FUNC   = 0x01
-EX_BAD_ADDR   = 0x02
-EX_BAD_VALUE  = 0x03
-EX_DEV_FAIL   = 0x04
+EX_BAD_FUNC   = 0x01   # 非法功能码
+EX_BAD_ADDR   = 0x02   # 非法数据地址
+EX_BAD_VALUE  = 0x03   # 非法数据值
+EX_DEV_FAIL   = 0x04   # 从站设备故障
 
 def exception_response(slave, func, code):
     return build_rtu(slave, (func | 0x80), bytes([code]))
 ```
 
-> 广播（地址 0）请求从站一律不回包，也不回异常。
+> [!CAUTION] 广播不回包
+> 广播（地址 0）请求从站一律不回包，也不回异常。异常码完整定义见 [[Modbus]] §7。
 
 ---
 
-# 5. ASCII 模式
+## 🔤 5. ASCII 模式
 
 ASCII 帧：以 `':'` 起，把每字节转成 2 个十六进制字符，末尾附 LRC 字符并 `CR LF` 结束。
 
@@ -183,18 +204,18 @@ def ascii_decode(frame: bytes):
     return raw[:-1]                          # 去掉末尾 LRC 字节
 ```
 
-示例：读保持寄存器请求 `01 03 00 00 00 02`，LRC=`FA`：
-
-```python
-assert ascii_encode(bytes([0x01, 0x03, 0x00, 0x00, 0x00, 0x02])) == \
-       b":010300000002FA\r\n"
-```
+> [!EXAMPLE] ASCII 编码示例
+> 读保持寄存器请求 `01 03 00 00 00 02`，LRC=`FA`：
+> ```python
+> assert ascii_encode(bytes([0x01, 0x03, 0x00, 0x00, 0x00, 0x02])) == \
+>        b":010300000002FA\r\n"
+> ```
 
 ---
 
-# 6. Modbus TCP（MBAP）
+## 🌐 6. Modbus TCP（MBAP）
 
-TCP 帧 = MBAP 头(7B) + PDU（无地址、无 CRC），MBAP = `事务ID(2) + 协议ID(2,=0) + 长度(2) + 单元ID(1)`。长度 = PDU 字节数 + 1（加单元ID）。
+TCP 帧 = MBAP 头(7B) + PDU（**无地址、无 CRC**），MBAP = `事务ID(2) + 协议ID(2,=0) + 长度(2) + 单元ID(1)`。长度 = PDU 字节数 + 1（加单元 ID）。
 
 ```python
 import struct
@@ -211,11 +232,12 @@ def mbap_decode(frame: bytes):
     return {"tid": tid, "unit": unit, "func": pdu[0], "data": pdu[1:]}
 ```
 
-> TCP 没有地址和 CRC —— 可靠传输和差错由 TCP + MBAP 的 Length 字段负责。
+> [!NOTE] TCP 为何无 CRC
+> 可靠传输和差错由 TCP + MBAP 的 Length 字段负责，因此去掉了 RTU 的 CRC。帧结构对照见 [[Modbus]] §3.3。
 
 ---
 
-# 7. 主站 → 从站 一问一答示例
+## 🔄 7. 主站 → 从站 一问一答示例
 
 模拟一个只有 4 个保持寄存器的从站，主站先读后写：
 
@@ -234,14 +256,11 @@ class Slave:
         if msg["slave"] != self.address:
             if msg["slave"] == 0:           # 广播：处理但不回包
                 self._apply_broadcast(msg)
-                return None
             return None
         try:
             return self._reply(msg)
         except KeyError:
-            args = frame[2:-2]
-            func = msg["func"]
-            return exception_response(self.address, func, EX_BAD_ADDR)
+            return exception_response(self.address, msg["func"], EX_BAD_ADDR)
 
     def _apply_broadcast(self, msg):
         pass                                # 例如写多寄存器时改数据但不回
@@ -269,10 +288,7 @@ def run_master(slave, requests):
     for desc, frame in requests:
         print(desc, frame.hex().upper())
         resp = slave.handle(frame)
-        if resp is None:
-            print("   (从站不回包)")
-        else:
-            print("   ->", resp.hex().upper())
+        print("   (从站不回包)" if resp is None else "   -> " + resp.hex().upper())
 
 
 slave = Slave(1, [0x1234, 0xABCD, 0, 0])
@@ -285,24 +301,22 @@ requests = [
 run_master(slave, requests)
 ```
 
-输出示意：
+输出示意（CRC 由 `crc_bytes` 实际算出，此处部分为示意值）：
 
 ```text
-读保持寄存器(0x03) 010300000002C40B
+读保持寄存器(0x03)      010300000002C40B
    -> 0103041234ABCD0020
-写单寄存器(0x06)写 0x0102 到 reg2 010602000102C9F8
-   -> 010602000102C9F8
-再读 4 个寄存器 010300000004444D
+写单寄存器(0x06)        010602000102C9F8
+   -> 010602000102C9F8          （原样回显）
+再读 4 个寄存器         010300000004444D
    -> 0103081234ABCD01020000xxxx
-读超出范围 -> 异常 02 010300040001xxxx
-   -> 018302C0F1        （功能 0x83 + 异常码 02）
+读超出范围 -> 异常 02   010300040001xxxx
+   -> 018302C0F1                 （功能 0x83 + 异常码 02）
 ```
-
-（上表 CRC 按需由 `crc_bytes` 实际算出，此处为示意值。）
 
 ---
 
-# 8. 时序与重试
+## ⏱️ 8. 时序与重试
 
 主站需自己管"多少时间没收到应答就重试"。把 RTU 帧间隔换算成**字符时间**：
 
@@ -312,31 +326,65 @@ def char_us(baud):
     return 1_000_000 * 10 / baud
 
 def frame_gap_us(baud):
-    """RTU 两帧之间要求静默 ≥3.5 个字符时间。"""
+    """RTU 两帧之间要求静默 ≥ 3.5 个字符时间。"""
     return 3.5 * char_us(baud)
 
 print(frame_gap_us(9600))    # ≈ 3645 µs
 ```
 
-一句话：**主站发出请求后，在超时窗口内若收到且 CRC 通过即成功；否则重试几次后报错**。这是 Modbus 最本质的时序——跟底层 UART 的位时序叠加即可还原完整链路。
+> [!TIP] 最本质的时序
+> **主站发出请求后，在超时窗口内若收到且 CRC 通过即成功；否则重试几次后报错。** 这与底层 UART 位时序叠加即可还原完整链路。临界波特率（19200 断点）与固定 750 µs / 1750 µs 阈值见 [[modbus]] §1。
 
 ---
 
-# 9. 一图理解整体
+## 🧭 9. 一图理解整体
 
 ```text
-主站                      从站
- │  广播(地址0)：不回包      │
- │ ──────────────────────→ │
- │  正常请求: 地址+功能+数据+CRC │
- │ ──────────────────────→ │  校验CRC→执行操作
- │  应答:    地址+功能+数据+CRC │
- │ ←────────────────────── │
- │  异常:    地址+功能|80+异常码 │
- │ ←────────────────────── │
- │  超时 → 重试(通常3次)      │
+主站                              从站
+ │  广播(地址0)：不回包             │
+ │ ──────────────────────────────→ │
+ │  正常请求: 地址+功能+数据+CRC     │
+ │ ──────────────────────────────→ │  校验CRC → 执行操作
+ │  应答:    地址+功能+数据+CRC     │
+ │ ←────────────────────────────── │
+ │  异常:    地址+功能|80+异常码    │
+ │ ←────────────────────────────── │
+ │  超时 → 重试(通常3次)            │
 ```
 
-- RTU 两帧之间静默 ≥ 3.5 字符时间。
-- ASCII 帧间静默 ≥ 1 秒。
-- 从站若收到功能码不认识、地址越界、数据非法，回异常帧而非静默。
+- RTU 两帧之间静默 ≥ 3.5 字符时间；ASCII 帧间静默 ≥ 1 秒。
+- 从站若收到功能码不认识、地址越界、数据非法，回**异常帧**而非静默。
+
+---
+
+## ✅ 落地校验清单（Checklist）
+
+> [!SUCCESS] 运行本模拟代码前必过
+> - [ ] **CRC 自检**：`crc16_modbus([0x01,0x03,0x00,0x00,0x00,0x02]) == 0x0BC4`
+> - [ ] **CRC 字节序**：帧尾先低后高（`crc_bytes`）
+> - [ ] **数据大端**：16 位地址/数量用 `u16` 高字节在前
+> - [ ] **RTU 长度**：`parse_rtu` 校验 `len(frame) >= 4`
+> - [ ] **广播处理**：地址 0 执行但返回 None（不回包）
+> - [ ] **异常应答**：功能码 `| 0x80` + 异常码
+> - [ ] **ASCII 定界**：`:` 起始、`CR LF` 结束，LRC 校验
+> - [ ] **TCP MBAP**：Length = PDU + 1，Protocol ID = 0，无 CRC
+> - [ ] **超时重试**：帧间隔按波特率换算，超时重试典型 3 次
+
+---
+
+## 🔗 思考与延伸索引
+
+- [[Modbus]] — Modbus 协议层帧结构、功能码、数据模型总览
+- [[modbus]] — RS-485 Modbus RTU 硬件驱动与时序（C 语言实现）
+- [[UART-code]] — Modbus RTU 承载的底层 UART 收发模拟
+- [[CAN-code]] — 另一种总线的软件模拟实现对照
+- [[DMA、Buffer 与流量控制]] — RX 帧定界与流控在真实驱动中的落地
+
+---
+
+## 📚 参考资料
+
+1. **Modbus Organization** — *MODBUS Application Protocol Specification V1.1b3*, 2012.
+2. **Modbus Organization** — *Modbus over Serial Line Specification V1.02*, 2006.
+3. **Python** — `struct`、`pyserial`、`pymodbus` 官方文档.
+4. 项目内部笔记：[[Modbus]]、[[modbus]]。

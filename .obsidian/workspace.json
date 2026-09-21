@@ -4,35 +4,35 @@
     "type": "split",
     "children": [
       {
-        "id": "4a6ece46127f4720",
+        "id": "2391c00134bb036f",
         "type": "tabs",
         "children": [
           {
-            "id": "faf22e3658d059d5",
+            "id": "d68113b6399ac452",
             "type": "leaf",
             "state": {
               "type": "markdown",
               "state": {
-                "file": "通信和外设协议/SPI.md",
+                "file": "通信和外设协议/Modbus.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "SPI"
+              "title": "Modbus"
             }
           },
           {
-            "id": "0362dd622c3b3aa8",
+            "id": "5b2831c220570786",
             "type": "leaf",
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Learning-log/SPI-DMA-多核-Cache.md",
+                "file": "通信和外设协议/PCLe.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "SPI-DMA-多核-Cache"
+              "title": "PCLe"
             }
           }
         ],
@@ -176,7 +176,7 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "Excalidraw/I2C.excalidraw.md",
+                "file": "通信和外设协议/code/I2C-code.md",
                 "followCursor": false,
                 "showSearch": false,
                 "searchQuery": ""
@@ -204,9 +204,19 @@
               "icon": "smart-connections",
               "title": "Connections"
             }
+          },
+          {
+            "id": "5177b1ae060a6488",
+            "type": "leaf",
+            "state": {
+              "type": "excalidraw-sidepanel",
+              "state": {},
+              "icon": "excalidraw-icon",
+              "title": "Excalidraw 侧边面板"
+            }
           }
         ],
-        "currentTab": 5
+        "currentTab": 7
       }
     ],
     "direction": "horizontal",
@@ -231,44 +241,44 @@
       "smart-connections:Toggle Footer Connections": false
     }
   },
-  "active": "0501486d3021a97c",
+  "active": "5b2831c220570786",
   "lastOpenFiles": [
-    "Learning-log/DMA、Buffer 与流量控制.md",
-    "Learning-log/SPI-DMA-多核-Cache.md",
-    "Learning-log",
-    "通信和外设协议/code/Modbus-code.md",
-    "通信和外设协议/Excalidraw/SPI.excalidraw.md",
     "通信和外设协议/Excalidraw/UART.excalidraw.md",
-    "通信和外设协议/SPI.md",
-    "通信和外设协议/UART.md",
-    "dec9.py",
-    "dec8.py",
-    "dec7.py",
-    "dec6.py",
-    "magic.py",
-    "dec5.py",
-    "dec4.py",
-    "dec3.py",
-    "dec2.py",
-    "通信和外设协议/Modbus.md",
+    "通信和外设协议/Excalidraw/I2C.excalidraw.md",
     "通信和外设协议/Excalidraw/Modbus.excalidraw.md",
-    "renode-use/renode调试与仿真.md",
-    "renode-use/renode-stm32f4外设和使用.md",
-    "renode-use/renode外设仿真.md",
-    "renode-use/renode用法.md",
-    "LICENSE.md",
-    "c-cpp高级特性和用法/c/嵌入式内核.md",
-    "c-cpp高级特性和用法/c/C语言高级用法.md",
-    "c-cpp高级特性和用法/cpp/Lambda 回调与单例模式.md",
-    "c-cpp高级特性和用法/README.md",
-    "c-cpp高级特性和用法/cpp/枚举constexpr多态与GCC扩展.md",
-    "c-cpp高级特性和用法/cpp/类型擦除与轻量 RTTI.md",
-    "c-cpp高级特性和用法/cpp/etl.md",
-    "C 语言高级用法.md",
-    "c-cpp高级特性和用法/cpp/ETL容器与萃取.md",
-    "c-cpp高级特性和用法/c/面向对象C与设备模型.md",
-    "c-cpp高级特性和用法/c/C语言的宏魔法.md",
+    "通信和外设协议/Excalidraw/CAN.excalidraw.md",
     "通信和外设协议/CAN.md",
+    "通信和外设协议/PCLe.md",
+    "网络协议/协议核心/IP.md.tmp.43228.1789971358467",
+    "网络协议/协议核心/UDP.md.tmp.43228.1789971356670",
+    "通信和外设协议/USB.md.tmp.43228.1789971356473",
+    "网络协议/Excalidraw/HTTP.excalidraw.md",
+    "网络协议/Excalidraw/HTTP.excalidraw.md.tmp.43228.1789971332892",
+    "通信和外设协议/PCLe.md.tmp.43228.1789971326948",
+    "网络协议/协议核心/UDP.md.tmp.43228.1789971323137",
+    "网络协议/协议核心/DHCP.md.tmp.43228.1789971213678",
+    "网络协议/协议核心/SSH.md.tmp.43228.1789971168268",
+    "网络协议/协议核心/http.md.tmp.43228.1789970981169",
+    "网络协议/Excalidraw",
+    "网络协议/协议核心/FTP.md",
+    "网络协议/协议核心/DHCP.md",
+    "网络协议/协议核心/SSH.md",
+    "网络协议/协议核心/FDP.md",
+    "网络协议/协议核心/mqtt.md",
+    "网络协议/协议核心/http.md",
+    "网络协议/协议核心/IP.md",
+    "网络协议/协议核心/UDP.md",
+    "网络协议/协议核心/TCP.md",
+    "通信和外设协议/USB.md",
+    "未命名.md",
+    "通信和外设协议/Modbus.md",
+    "Excalidraw/Drawing 2026-09-21 11.21.50.excalidraw.md",
+    "通信和外设协议/Excalidraw/xxx.excalidraw.md",
+    "通信和外设协议/code/I2C-code.md",
+    "通信和外设协议/code/SPI-code.md",
+    "c-cpp高级特性和用法/cpp/ETL容器与萃取.md",
+    "Learning-log/SPI-DMA-多核-Cache.md",
+    "Learning-log/DMA、Buffer 与流量控制.md",
     "renode-use/笔记.canvas",
     "通信和外设协议/Excalidraw/I2C.svg",
     "通信和外设协议/Excalidraw/SPI.svg",
