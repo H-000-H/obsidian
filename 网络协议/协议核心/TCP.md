@@ -101,19 +101,19 @@ created: 2026-09-21
 
 ### 2.2 字段逐条说明
 
-| 字段 | 位宽 | 名称（英文） | 作用 | 排错/工程要点 |
-| :--- | :--: | :--- | :--- | :--- |
-| 源端口 | 16 | Source Port | 发送方 socket 端口，1–65535（0 保留） | 临时端口范围 `net.ipv4.ip_local_port_range`（默认 32768–60999）；客户端端口耗尽常因并发过高 |
-| 目的端口 | 16 | Destination Port | 接收方服务端口 | `ss -ltnp` 核对监听端口与进程；防火墙/NAT 改写会导致连接被重置 |
-| 序号 | 32 | Sequence Number, Seq | 本段数据**第一个字节**在发送方字节流中的编号；SYN/FIN 各消耗 1 个序号（不携带数据也占位） | 32 bit 回绕（wrap around）：1 Gbps 约 17 分钟绕一圈；靠 **PAWS**（时间戳选项）识别陈旧重复段 |
-| 确认号 | 32 | Acknowledgment Number, Ack | 期望收到对方下一字节的序号 = 已成功累积收到的最高连续序号 + 1 | 仅当 `ACK` 标志置位才有效；**累积确认（cumulative ACK）**导致乱序场景产生重复 ACK（DupACK） |
-| 数据偏移 | 4 | Data Offset / Header Length | 首部长度，单位 **4 字节**；纯首部 = 5（20 字节），最大 15（60 字节） | 抓包里显示 `data offset: 8` 说明带 12 字节选项（典型：MSS 4 + SACK-perm 4 + TS 10→补齐） |
-| 保留 | 6（RFC 793）/ 4（RFC 9293） | Reserved | 置 0；RFC 854 曾提议 Nonce 位，未普及 | 中间盒（middlebox）若改写此区导致 RST，是云环境疑难杂症来源之一 |
-| 标志位 | 6（RFC 793）+ ECN 2 = 8（RFC 9293） | Flags / Control Bits | 见 §2.3 逐位解释 | `tcpdump` 输出中 `S`=SYN、`F`=FIN、`.`=无、`P`=PSH、`R`=RST，如 `S.`、`F.`、`.` |
-| 窗口 | 16 | Window Size, Advertised Window | 接收方还能接收多少字节（**rwnd**），从 Ack 处开始计算 | 只有 16 bit → 上限 65535 字节；必须靠**窗口缩放（Window Scaling）**选项突破「带宽时延积」限制 |
-| 校验和 | 16 | Checksum | 覆盖**伪首部 + TCP 首部 + 数据**的 16 bit 反码和 | 能查多数误码，**不具备密码学强度**；现代依赖网卡卸载（TSO/GRO/L4 checksum offload），抓包看到的 `incorrect` 常为假告警 |
-| 紧急指针 | 16 | Urgent Pointer | 指向紧急数据末端的偏移，配合 `URG` 位 | **实践中已废弃**（BSD/主流栈未实现真正 out-of-band 语义），`TCP_MAXSEG`/`send(MSG_OOB)` 不要依赖 |
-| 选项 | 0–320（补齐 32 bit） | Options | MSS、窗口缩放、SACK、时间戳等 | 仅在 **SYN 报文**中协商 MSS / WS / SACK-permitted；`nop`(kind 0) 用于对齐，`eol`(kind 1) 结束 |
+| 字段   |               位宽                | 名称（英文）                         | 作用                                                   | 排错/工程要点                                                                           |
+| :--- | :-----------------------------: | :----------------------------- | :--------------------------------------------------- | :-------------------------------------------------------------------------------- |
+| 源端口  |               16                | Source Port                    | 发送方 socket 端口，1–65535（0 保留）                          | 临时端口范围 `net.ipv4.ip_local_port_range`（默认 32768–60999）；客户端端口耗尽常因并发过高               |
+| 目的端口 |               16                | Destination Port               | 接收方服务端口                                              | `ss -ltnp` 核对监听端口与进程；防火墙/NAT 改写会导致连接被重置                                           |
+| 序号   |               32                | Sequence Number, Seq           | 本段数据**第一个字节**在发送方字节流中的编号；SYN/FIN 各消耗 1 个序号（不携带数据也占位） | 32 bit 回绕（wrap around）：1 Gbps 约 17 分钟绕一圈；靠 **PAWS**（时间戳选项）识别陈旧重复段                 |
+| 确认号  |               32                | Acknowledgment Number, Ack     | 期望收到对方下一字节的序号 = 已成功累积收到的最高连续序号 + 1                   | 仅当 `ACK` 标志置位才有效；**累积确认（cumulative ACK）**导致乱序场景产生重复 ACK（DupACK）                   |
+| 数据偏移 |                4                | Data Offset / Header Length    | 首部长度，单位 **4 字节**；纯首部 = 5（20 字节），最大 15（60 字节）         | 抓包里显示 `data offset: 8` 说明带 12 字节选项（典型：MSS 4 + SACK-perm 4 + TS 10→补齐）             |
+| 保留   |     6（RFC 793）/ 4（RFC 9293）     | Reserved                       | 置 0；RFC 854 曾提议 Nonce 位，未普及                          | 中间盒（middlebox）若改写此区导致 RST，是云环境疑难杂症来源之一                                            |
+| 标志位  | 6（RFC 793）+ ECN 2 = 8（RFC 9293） | Flags / Control Bits           | 见 §2.3 逐位解释                                          | `tcpdump` 输出中 `S`=SYN、`F`=FIN、`.`=无、`P`=PSH、`R`=RST，如 `S.`、`F.`、`.`               |
+| 窗口   |               16                | Window Size, Advertised Window | 接收方还能接收多少字节（**rwnd**），从 Ack 处开始计算                    | 只有 16 bit → 上限 65535 字节；必须靠**窗口缩放（Window Scaling）**选项突破「带宽时延积」限制                  |
+| 校验和  |               16                | Checksum                       | 覆盖**伪首部 + TCP 首部 + 数据**的 16 bit 反码和                  | 能查多数误码，**不具备密码学强度**；现代依赖网卡卸载（TSO/GRO/L4 checksum offload），抓包看到的 `incorrect` 常为假告警 |
+| 紧急指针 |               16                | Urgent Pointer                 | 指向紧急数据末端的偏移，配合 `URG` 位                               | **实践中已废弃**（BSD/主流栈未实现真正 out-of-band 语义），`TCP_MAXSEG`/`send(MSG_OOB)` 不要依赖         |
+| 选项   |        0–320（补齐 32 bit）         | Options                        | MSS、窗口缩放、SACK、时间戳等                                   | 仅在 **SYN 报文**中协商 MSS / WS / SACK-permitted；`nop`(kind 0) 用于对齐，`eol`(kind 1) 结束    |
 
 ### 2.3 标志位（Flags）逐位解释
 
