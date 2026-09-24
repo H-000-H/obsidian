@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "English/2026-9-23.md",
+                "file": "kernel/kernel 中断系统（ARM32）学习笔记.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "2026-9-23"
+              "title": "kernel 中断系统（ARM32）学习笔记"
             }
           }
         ]
@@ -176,8 +176,8 @@
             "state": {
               "type": "git-view",
               "state": {},
-              "icon": "git-pull-request",
-              "title": "Source Control"
+              "icon": "lucide-ghost",
+              "title": "git-view"
             }
           },
           {
@@ -186,8 +186,8 @@
             "state": {
               "type": "smart-connections-view",
               "state": {},
-              "icon": "smart-connections",
-              "title": "Connections"
+              "icon": "lucide-ghost",
+              "title": "smart-connections-view"
             }
           },
           {
@@ -196,8 +196,8 @@
             "state": {
               "type": "excalidraw-sidepanel",
               "state": {},
-              "icon": "excalidraw-icon",
-              "title": "Excalidraw 侧边面板"
+              "icon": "lucide-ghost",
+              "title": "excalidraw-sidepanel"
             }
           },
           {
@@ -206,8 +206,8 @@
             "state": {
               "type": "advanced-tables-toolbar",
               "state": {},
-              "icon": "spreadsheet",
-              "title": "Advanced Tables"
+              "icon": "lucide-ghost",
+              "title": "advanced-tables-toolbar"
             }
           }
         ],
@@ -239,12 +239,19 @@
   },
   "active": "3dfd784028f819f6",
   "lastOpenFiles": [
-    "English/2026-9-22.md",
-    "English/2026-9-23.md",
+    "kernel/ARM zImage head.S 启动 学习笔记.md",
+    "kernel/ARM Kernel head.S 内核启动 学习笔记.md",
+    "kernel/memory/页表预分配 mmu.c.md",
+    "English/2026-9-24.md",
     "English/templete.md",
-    "kernel/ARM zImage head.S 启动壳 学习笔记.md",
-    "kernel/arm 汇编 补充.md",
+    "kernel/memory/完成清单.md",
+    "kernel/kernel 中断系统（ARM32）学习笔记.md",
+    "kernel/进程 线程",
+    "kernel/memory",
     "kernel/常用寄存器.md",
+    "English/2026-9-23.md",
+    "English/2026-9-22.md",
+    "kernel/arm 汇编 补充.md",
     "网络协议/协议核心/IP.md",
     "kernel",
     "网络协议/协议核心/UDP.md",
@@ -252,7 +259,6 @@
     "网络协议/协议核心/SSH.md",
     "English/2026-9-21.md",
     "English/未命名.canvas",
-    "English/未命名.md",
     "网络协议/协议核心/DHCP.md",
     "English/未命名.base",
     "Learning-log/未命名.base",
@@ -270,12 +276,6 @@
     "网络协议/协议核心/FTP.md.tmp.43228.1789977289750",
     "网络协议/协议核心/FTP.md",
     "通信和外设协议/PCLe.md",
-    "网络协议/协议核心/FTP.md.tmp.43228.1789977188748",
-    "网络协议/协议核心/FTP.md.tmp.43228.1789977188617",
-    "网络协议/Excalidraw/Socket.excalidraw.md",
-    "网络协议/Excalidraw/FTP.excalidraw.md",
-    "网络协议/Excalidraw/SSH.excalidraw.md",
-    "网络协议/Excalidraw/MQTT.excalidraw.md",
     "renode-use/笔记.canvas",
     "通信和外设协议/Excalidraw/I2C.svg",
     "通信和外设协议/Excalidraw/SPI.svg",

@@ -1,4 +1,4 @@
-# ARM zImage head.S 启动壳 学习笔记
+# ARM zImage head.S 启动 学习笔记
 
 > 基于 `arch/arm/boot/compressed/head.S`，Linux lf-6.18.y，IMX6ULL / Cortex-A7
 
