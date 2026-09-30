@@ -1,29 +1,56 @@
-# kernel 中断系统（ARM32）学习笔记
+---
+title: 中断系统（ARM32）学习笔记
+tags:
+  - linux-kernel
+  - arm32
+  - interrupt
+  - irq-desc
+  - softirq
+  - tasklet
+  - workqueue
+  - ipi
+status: Completed
+created: 2026-09-30
+---
 
-> 作用域：本篇覆盖 Linux 内核于中断入口与分发（`arch/arm/kernel/irq.c`）以及下半部（Bottom Half，SoftIRQ / Tasklet / Workqueue）两大块内容。它是《ARM Kernel head.S 内核启动 学习笔记》的中断相关延伸：内核在启动完成、`start_kernel()` 进入 C 语言虚拟世界后，中断子系统才逐步建立起来。
+# ⚡ 中断系统学习笔记（ARM32）
 
-## 一、中断入口与分发（`arch/arm/kernel/irq.c`）
+> [!INFO] 笔记概览
+> - **定位**：覆盖 Linux 内核于中断入口与分发（`arch/arm/kernel/irq.c`）以及下半部（Bottom Half，SoftIRQ / Tasklet / Workqueue）两大块内容。它是《ARM Kernel head.S 内核启动 学习笔记》的中断相关延伸：内核在启动完成、`start_kernel()` 进入 C 语言虚拟世界后，中断子系统才逐步建立起来。
+> - **内容范围**：`irq_desc` 控制中心 · `handle_IRQ` 安全阀门 · 稀疏中断（SPARSE_IRQ）· 核间中断（IPI）· 上半部/下半部切分 · 三种下半部演进体系对照 · 标准 10 大软中断位图 · 软中断执行引擎与防护屏障
+> - **推荐路径**：§1 中断入口与分发 → §2 下半部架构 → §3 三大承载机制 → §4 10 大软中断拆解 → §5 执行引擎与防护 → §6 校验与延伸
 
-### 1. 控制中心 `struct irq_desc`
+---
 
-Linux 中**每个逻辑中断号的全局户口本**。它的三大职责：
+## 🚪 1. 中断入口与分发（`arch/arm/kernel/irq.c`）
+
+### 1.1 控制中心 `struct irq_desc`
+
+Linux 中**每个逻辑中断号的全局户口本**。它身兼三重职责，向上、向下、居中各管一端：
 
 - **向下**对接硬件控制器操作集（`irq_chip`：mask / unmask / ack / eoi 等底层回调）；
 - **向上**连接外设驱动处理链表（`action`，多个 `irqaction` 串成链表共享同一个中断号）；
 - **中间**掌管流控（`handle_irq`，常见有 `handle_level_irq`、`handle_edge_irq` 等，决定电平/边沿触发语义）。
 
-### 2. `handle_IRQ` 的安全阀门
+### 1.2 `handle_IRQ` 的安全阀门
 
-- 拦截硬件毛刺或越界的非法中断（避免死机），计入 `irq_err_count`；
+- 拦截硬件毛刺或越界的非法中断，计入 `irq_err_count`；
 - 合规中断查出 `desc`，移交给通用中断流控层继续处理。
 
-### 3. 稀疏中断（`CONFIG_SPARSE_IRQ`）
+> [!NOTE] 安全阀门的价值
+> 非法中断一旦放行到通用流控层，轻则统计失真，重则在中断上下文中触发不可预期的路径。`handle_IRQ` 的第一道拦截正是为了把「硬件毛刺、越界号」全部挡在门外，再看关系是否清白再放行。
+
+### 1.3 稀疏中断（`CONFIG_SPARSE_IRQ`）
+
+最早的中断子系统为所有可能的最大中断号一次性铺满静态描述符大数组，内存开销巨大。开启 `CONFIG_SPARSE_IRQ` 后采用以下做法：
 
 - 摒弃低效的静态大数组，改用**基数树**按需动态分配 `irq_desc`；
 - 通过 `arch_probe_nr_irqs` 动态设定中断号天花板；
-- 大幅节省内存（不会为所有可能的最大中断号一次性铺满描述符数组）。
+- 大幅节省内存——不会为所有可能的最大中断号一次性铺满描述符数组。
 
-### 4. 核间中断（IPI，Inter-Processor Interrupt）
+### 1.4 核间中断（IPI，Inter-Processor Interrupt）
+
+多核协作离不开跨核信令，ARM 上最常见的载体就是 IPI：
 
 - 多核之间通过写 GIC 触发 SGI（Software Generated Interrupt）软中断，敲响目标核心的门铃；
 - 配合共享内存队列完成任务：Reschedule（重新调度）、Call function（TLB 广播冲刷、函数调用）等跨核协作；
@@ -31,14 +58,17 @@ Linux 中**每个逻辑中断号的全局户口本**。它的三大职责：
 
 ---
 
-## 二、下半部（Bottom Half）架构机制
+## 🔪 2. 下半部（Bottom Half）架构机制
 
 Linux 将一次完整的中断处理切为两个半部：
 
-- **上半部（Top Half / HardIRQ）**：关中断执行，仅做核心寄存器 ACK、应答硬件、登记事件后立即退出，要求快进快出。
+- **上半部（Top Half / HardIRQ）**：关中断执行，仅做核心寄存器 ACK、应答硬件、登记事件后立即退出，要求**快进快出**。
 - **下半部（Bottom Half）**：开中断执行，负责吞吐量大、耗时长的数据包解析、磁盘 I/O 排队、回调执行。
 
-### 1. 下半部演进体系对比
+> [!IMPORTANT] 为什么要切成两个半部
+> 中断上下文要求**短、快、不阻塞**——在上半部里做任何耗时工作都会推迟所有更紧急的中断。把「核心应答」留给上半部、把「重字节吞吐与阻塞型逻辑」下沉到下半部，正是中断系统吞吐与实时性的根本取舍。
+
+## 🗂️ 3. 三大下半部承载机制对照
 
 Linux 提供了三种形态各异的下半部承载机制：
 
@@ -48,7 +78,10 @@ Linux 提供了三种形态各异的下半部承载机制：
 | **Tasklet** | 中断上下文 | **串行化保证**：基于 SoftIRQ 构建，同类型的 Tasklet 严禁跨核并发 | **严禁睡眠** | 普通驱动的快速下半部处理，免除跨核重入并发锁负担 |
 | **Workqueue（工作队列）** | 进程上下文（内核线程 `kworker`） | 由普通进程调度器参与排队与轮转 | **允许睡眠/调度**（可拿 Mutex、做 I/O、分配内存） | 耗时长、需睡眠、需等待锁或大块内存分配的低速驱动逻辑 |
 
-### 2. 标准 10 大软中断（SoftIRQ）位图与全景拆解
+> [!WARNING] 上下文纪律
+> SoftIRQ 与 Tasklet 都运行在**中断上下文**里，**任何时候严禁睡眠**（拿 Mutex、触发调度、加载磁盘都是禁区）；一旦睡下去就是 `BUG: scheduling while atomic`。需要睡眠的耗时逻辑，务必上移到允许阻塞的 Workqueue 承载。
+
+## 🧮 4. 标准 10 大软中断（SoftIRQ）位图与全景拆解
 
 内核在 `include/linux/interrupt.h` 中严格定义了 10 种标准的软中断类型。每个 CPU 维护一个 32 位的 `__softirq_pending` 位图，每一个 bit 代表一个软中断类型（**编号越小，优先级越高**）：
 
@@ -70,12 +103,12 @@ enum
 };
 ```
 
-#### ① `HI_SOFTIRQ`（Bit 0）
+### 4.1 `HI_SOFTIRQ`（Bit 0）
 
 - **本质**：高优先级 Tasklet。
 - **机制**：优先于所有其他软中断处理，专供对延迟极度敏感的外设（如特定声卡驱动、低延迟总线控制器），确保其回调以最小的时钟抖动抢先完成。
 
-#### ② `TIMER_SOFTIRQ`（Bit 1）
+### 4.2 `TIMER_SOFTIRQ`（Bit 1）
 
 - **本质**：低精度系统定时器（Timer Wheel，时间轮）执行下半部。
 - **机制**：由系统心跳滴答（Tick IRQ）在上半部触发 `raise_softirq(TIMER_SOFTIRQ)`。
@@ -84,13 +117,13 @@ enum
   - 执行驱动通过 `timer_setup()` / `mod_timer()` 注册的超时回调函数；
   - 驱动系统时间的软件更新与统计。
 
-#### ③ `NET_TX_SOFTIRQ`（Bit 2）
+### 4.3 `NET_TX_SOFTIRQ`（Bit 2）
 
 - **本质**：网络发包清理（Transmit Cleanup）。
 - **机制**：网卡发送队列通常采用环形缓冲区（Ring Buffer）。当网卡 DMA 把数据包推送到物理介质后，会发中断通知 CPU。
 - **职责**：释放已成功发送的 `sk_buff` 结构体内存，解映射 DMA 缓冲区，唤醒被阻塞的上层发送队列，避免发送端 Socket 内存枯竭。
 
-#### ④ `NET_RX_SOFTIRQ`（Bit 3）
+### 4.4 `NET_RX_SOFTIRQ`（Bit 3）
 
 - **本质**：网络收包核心总线（NAPI 轮询引擎）。
 - **机制**：整颗 Linux 内核中**吞吐量最大、最容易触发软中断风暴**的类型。
@@ -99,19 +132,19 @@ enum
   - 在开中断状态下批量从网卡 RX Ring Buffer 中抓取数据包，封装为 `struct sk_buff`；
   - 顺次推入链路层、IP 网络层（路由查找、Netfilter 防火墙）、TCP/UDP 传输层，直至压入用户进程 Socket 的接收队列。
 
-#### ⑤ `BLOCK_SOFTIRQ`（Bit 4）
+### 4.5 `BLOCK_SOFTIRQ`（Bit 4）
 
 - **本质**：通用块设备（Block I/O）完成下半部。
 - **机制**：当磁盘控制器（SATA/eMMC/NVMe）完成一次扇区 DMA 读写后，硬中断唤醒下半部。
 - **职责**：执行 `blk_done_softirq()`，遍历完成的 `struct request`，通知上层文件系统（Ext4、Btrfs）或通用块层对应请求已就绪，触发 BIO 回调并唤醒等待该 I/O 的阻塞进程。
 
-#### ⑥ `IRQ_POLL_SOFTIRQ`（Bit 5）
+### 4.6 `IRQ_POLL_SOFTIRQ`（Bit 5）
 
 - **本质**：针对超高速存储介质的混合轮询架构。
 - **机制**：应对 NVMe 等超高 IOPS 设备设计的接口（由 blk-iopoll 演进而来）。
 - **职责**：在高 I/O 吞吐下，规避单次请求硬中断开销，转而借由下半部批量轮询存储控制器的完成队列，大幅压降超高并发存储下的中断负载。
 
-#### ⑦ `TASKLET_SOFTIRQ`（Bit 6）
+### 4.7 `TASKLET_SOFTIRQ`（Bit 6）
 
 - **本质**：系统常规 Tasklet 处理池。
 - **机制**：由 `tasklet_schedule()` 触发。
@@ -120,7 +153,10 @@ enum
   - 但**不同类型**的 Tasklet 可以跨核并发。
   - 这极大地简化了驱动编写门槛，驱动开发者无需为多核并发重入绞尽脑汁设计细粒度自旋锁。
 
-#### ⑧ `SCHED_SOFTIRQ`（Bit 7）
+> [!SUCCESS] Tasklet 的免锁承诺
+> 但凡「同一 Tasklet 必须串行、绝不重入」的诉求，`TASKLET_STATE_RUN` 已经替你兜底——同一实例不会跨核并发，直接用它省掉多核自旋锁；只有**跨不同类型 Tasklet 之间**的共享数据仍需要你自备锁，别误以为完全免锁。
+
+### 4.8 `SCHED_SOFTIRQ`（Bit 7）
 
 - **本质**：多核 CFS 调度器负载均衡下半部（Load Balancing）。
 - **机制**：在 SMP 多核系统中，各核的负载可能失衡（如 CPU 0 上排了 10 个进程，CPU 1 却空闲）。
@@ -129,24 +165,26 @@ enum
   - 遍历各调度域（Scheduling Domains）与调度组（Sched Groups）；
   - 计算各核心运行队列（Runqueue）的负载权重，必要时执行**跨核进程强制迁移**，平抑系统负载。
 
-#### ⑨ `HRTIMER_SOFTIRQ`（Bit 8）
+### 4.9 `HRTIMER_SOFTIRQ`（Bit 8）
 
 - **本质**：高精度定时器（High-Resolution Timers）软中断下半部。
 - **机制**：早期为避免高精度定时器回调阻塞硬中断而引入。
 - **演进**：现代高精度定时器机制已大幅优化，大多数硬实时高精定时任务直接在硬件时钟硬中断（HardIRQ）上下文执行完毕；仅在部分复杂的软超时或配置降级场景下，用该软中断做兜底批处理。
 
-#### ⑩ `RCU_SOFTIRQ`（Bit 9）
+### 4.10 `RCU_SOFTIRQ`（Bit 9）
 
 - **本质**：读-复制-更新（Read-Copy Update）内存回收机制的核心推进器。
-- **机制**：Linux 内核依赖无锁 RCU 实现高并发读取。写者更新数据后，旧数据不能立刻 `kfree()`，必须等待所有正在读取的 CPU 退出临界区（经历一个“宽限期” Grace Period）。
+- **机制**：Linux 内核依赖无锁 RCU 实现高并发读取。写者更新数据后，旧数据不能立刻 `kfree()`，必须等待所有正在读取的 CPU 退出临界区（经历一个"宽限期" Grace Period）。
 - **职责**：
   - 周期性检查本 CPU 是否已穿透静止状态（Quiescent State）；
   - 协同全局汇报宽限期结束；
   - 批量清空本核积压的 `call_rcu()` 回调链表，真正释放被淘汰的旧结构体内存。
 
-### 3. 软中断执行引擎与防护屏障
+---
 
-软中断是一把双刃剑：它拥有直通硬件的高速性能，但如果不加节制，暴风雨般的网络包或外设事件会立刻让系统陷入“活锁（Livelock）”状态。
+## ⚙️ 5. 软中断执行引擎与防护屏障
+
+软中断是一把双刃剑：它拥有直通硬件的高速性能，但如果不加节制，暴风雨般的网络包或外设事件会立刻让系统陷入"活锁（Livelock）"状态。
 
 ```
 [外设硬中断上半部] ──> raise_softirq(nr) ──> 将当前 CPU 的 __softirq_pending 第 nr 位置 1
@@ -172,19 +210,65 @@ enum
      (挂入 CFS 运行队列排队，降为普通分时任务)
 ```
 
-#### ① 切栈防爆（`CONFIG_IRQSTACKS`）
+> [!WARNING] 警惕软中断风暴（Livelock）
+> 若软中断无限被重新触发又重新处理，CPU 会被迫无限循环在那个高频软中断上，用户态与调度器被完全饿死——现象就是「系统看着很忙、却完全不响应」。所以内核才设下 **10 次 / 2ms** 的熔断闸门，超出立即降级给 `ksoftirqd`。排查"软中断打满一核"时，优先看是不是某个高频外设事件在死命 `raise_softirq()`。
+
+### 5.1 切栈防爆（`CONFIG_IRQSTACKS`）
 
 - 为每个 CPU 分配专属独立中断栈（`irq_stack_ptr`）；
 - 在 `do_softirq_own_stack` 中通过汇编偷换 SP；
 - 防止下半部嵌套执行或深调用链压爆当前进程脆弱的 8KB 内核栈。
 
-#### ② 抹 Flag 与优先就地执行（Local In-place Execution）
+> [!CAUTION] 内核栈红线
+> 内核栈容量极小（进程常用 8KB），下半部一旦嵌套或递归过深，就会一脚踩破栈底造成不可恢复的崩溃。依赖独立中断栈只是把风险搬到独立空间；真正的防线仍是**别在中断/软中断上下文里做深层递归或大栈消耗**，能下沉到 Workqueue 就下沉。
+
+### 5.2 抹 Flag 与优先就地执行（Local In-place Execution）
 
 - **就地执行的极速优势**：硬中断刚结束，CPU 核心处于高度激活状态，驱动相关指令和数据正热烫地驻留在 L1/L2 Cache 中。就地借用当前上下文处理软中断，避开了极其昂贵的进程上下文切换、TLB 冲刷与 Cache 颠簸，实现了微秒级的极致网络吞吐和定时器精度。
 - **原子清标志**：进入 `__do_softirq()` 后，一次性读出 32 位位图并将物理寄存器清零，开硬件中断逐 bit 遍历调用对应的 `action()` 业务函数，允许新的硬中断随时打入。
 
-#### ③ 兜底降级：常驻线程 `ksoftirqd/x`
+### 5.3 兜底降级：常驻线程 `ksoftirqd/x`
 
 - **限额刹车**：同一个软中断上下文最多循环重试 **10 次**或执行满 **2 毫秒**。
 - **平民化防假死**：一旦触发超时熔断，内核调用 `wakeup_softirqd()` 唤醒当前核绑定的 `ksoftirqd/x` 线程。
 - **调度隔离**：`ksoftirqd` 在系统初始化时由 2 号进程（`kthreadd`）静态创建（每个核配且仅配一个，绝不动态创建）。它以普通的 `SCHED_NORMAL`（Nice = 0）身份挂入 CFS 红黑树，和终端 Shell、业务 App 平等均分时间片，并通过 `cond_resched()` 主动让渡 CPU。这保证了即使外设流量将网络打满丢包，操作系统的用户界面和调度系统也绝不假死。
+
+> [!NOTE] ksoftirqd 降级不等于低效
+> 恰恰相反，被降到 `ksoftirqd` 说明该软中断已经「喂不饱」，系统在主动止损保护调度器与用户态。真正的高吞吐路径（就地执行 + 未超标）远比降级更快，所以**正常稳态应尽量不触发熔断**；如果 `ksoftirqd` 长期满载，反而要回头排查驱动是否在软中断里做了过重的工作。
+
+---
+
+## ✅ 落地校验清单（Checklist）
+
+> [!SUCCESS] 中断系统验证必过
+> - [ ] **`irq_desc` 三大职责**：`irq_chip`（向下）、`action` 链（向上）、`handle_irq` 流控（中间）各归其位
+> - [ ] **安全阀门**：`handle_IRQ` 拦截非法中断并计入 `irq_err_count`，越界号不进入流控层
+> - [ ] **稀疏中断**：`CONFIG_SPARSE_IRQ` + 基数树按需分配，确认 `arch_probe_nr_irqs` 动态天花板
+> - [ ] **IPI 链路**：SGI 触发 → Reschedule / Call function 队列协作 → `/proc/interrupts` 可见统计
+> - [ ] **半部切分**：上半部只做 ACK+登记快退，耗时与阻塞逻辑全部下沉下半部
+> - [ ] **上下文纪律**：SoftIRQ / Tasklet 严禁睡眠；需睡眠逻辑一律 Workqueue（`kworker`）
+> - [ ] **SoftIRQ 自备锁**：同类型可跨核并行，共享数据必须自备锁
+> - [ ] **Tasklet 免锁边界**：同实例靠 `TASKLET_STATE_RUN` 防重入，跨类型仍要自备锁
+> - [ ] **软中断风暴熔断**：确认 10 次 / 2ms 限额与 `wakeup_softirqd` 兜底路径在场
+> - [ ] **内核栈红线**：`CONFIG_IRQSTACKS` 独立中断栈在列，且不在中断上下文做递归/大栈消耗
+> - [ ] **ksoftirqd 常态空闲**：稳态不触发熔断，长期满载则排查驱动软中断过载
+
+---
+
+## 🔗 思考与延伸索引
+
+- [[KERNEL SET_UP]] — ARM 内核启动流程：`start_kernel()` 进入 C 世界后中断子系统才开始建立
+- [[arm mm init.c]] — 内存初始化与 zone 划分，为中断/定时器等子系统提供内存底座
+- [[mmu.c kernel起步]] — 页表建立与虚拟地址空间布局，理解中断栈与 vmalloc 等区域的来源
+- [[lowmem 与 highmem]] — 与中断/软中断栈相关的内存分配边界（highmem 页不能直接解引用）
+- [[DMA、Buffer 与流量控制]] — 网络软中断 `NET_TX/RX_SOFTIRQ` 背后的发送/接收缓冲与流控语义
+
+---
+
+## 📚 参考资料
+
+1. **Linux Kernel 源码** — `arch/arm/kernel/irq.c`（`handle_IRQ`、`arch_show_interrupts`）.
+2. **Linux Kernel 源码** — `include/linux/interrupt.h`（`enum` 10 大 SoftIRQ 定义、`__softirq_pending`）.
+3. **Linux Kernel 源码** — `include/linux/irqdesc.h`、`kernel/irq/`（`struct irq_desc`、`handle_*_irq` 流控）.
+4. **Linux Kernel 源码** — `kernel/softirq.c`（`__do_softirq`、`do_softirq_own_stack`、`wakeup_softirqd`、`CONFIG_IRQSTACKS`）.
+5. **Understanding the Linux Kernel, 3rd Ed.**（O'Reilly）— 中断处理与下半部机制的经典论述.

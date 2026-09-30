@@ -1,20 +1,37 @@
-# ARM zImage head.S 启动 学习笔记
+---
+title: ARM zImage head.S 启动 学习笔记
+tags:
+  - Kernel
+  - ARM
+  - Boot
+  - Assembly
+  - XIP
+  - iMX6ULL
+  - Cortex-A7
+status: Completed
+created: 2026-09-30
+---
 
-> 基于 `arch/arm/boot/compressed/head.S`，Linux lf-6.18.y，IMX6ULL / Cortex-A7
+# 🚀 ARM zImage head.S 启动 学习笔记
+
+> [!INFO] 笔记概览
+> - **定位**：逐行剖析 `arch/arm/boot/compressed/head.S` 的 zImage 自解压壳，目标 i.MX6ULL / Cortex-A7 / Linux lf-6.18.y。
+> - **内容范围**：PIC 重定位 · 字节序 · 入口结构 · 内核落点 r4 · appended DTB 合并 · 撞车判定与 relocate · GOT/BSS 铺床 · 解压交棒 · XIP 对照 · ARMv7 CP15 · `__setup_mmu` 建表
+> - **推荐路径**：§1 启动主线 → §2 落点 r4 → §3 appended DTB → §4 撞车/relocate → §5 GOT/BSS → §6 解压交棒 → §7 XIP → §8 CP15 速查 → §9 `__setup_mmu`
 
 ---
 
-## 一、zImage 启动壳主线
+## 🔎 1. zImage 启动壳主线
 
-### 0. 一句话总纲
+### 1.1 一句话总纲
 
 zImage 是一个**自带重定位、自带页表、自带 malloc** 的 5MB 自举壳，毕生事业：把 piggy 里的压缩内核解压到 `r4`，清好 cache，跳进去自杀。所有指令只伺候三块地：
 
 - `[r4, r4+r9)` —— 内核将住的地
 - `[restart, r10]` —— 壳现在占的地（text + piggy + DTB + BSS + stack + 64K heap）
-- `GOT` —— 链接器"平行世界"的电话簿
+- `GOT` —— 链接器「平行世界」的电话簿
 
-### 1. PIC 三板斧（全文反复出现的母题）
+### 1.2 PIC 三板斧（全文反复出现的母题）
 
 镜像可能被放在任意物理地址，绝对寻址失效：
 
@@ -29,12 +46,15 @@ add   \tmp, \tmp, \res   @ ③ 锚点 + 差值 = 目标真实地址
 - `get_inflated_image_size`（156）：定位 piggy 末尾 4 字节 = 解压后大小（构建系统追加，u32 小端，最大 4GB）；`ldrb×4 + orr 移位拼装` = 手工 `get_unaligned_le32`（地址可能非 4 字节对齐，MMU 未就绪前不能冒险做非对齐访问）；
 - `LC0/LC1` 常数表（660）：`.word LC0` 存自己链接地址 → 与 `adr` 真实地址一比得 `delta = 真实 − 链接`；其余项存差值还原 `_edata`、`__bss_start`、`_end`、GOT 边界、栈顶。
 
-### 2. 字节序
+### 1.3 字节序与大小端处理
 
 - `be32tocpu` / `rev_l`：ARMv6+ 单条 `rev` 翻转 4 字节（v5 用 eor/bic/ror 模拟）；大端内核（`__ARMEB__`）下 no-op。
 - DTB magic 字段强制 big-endian：`OF_DT_MAGIC` 按端序定义成 `0xd00dfeed` / `0xedfe0dd0`，比较寄存器数值。
 
-### 3. 入口结构
+> [!TIP] 地址/尺寸比较一律走无符号
+> ARM 条件码中 `blo/bhs` 用无符号比较、`blt/bge` 用有符号比较。地址、页表偏移、镜像尺寸、DTB totalsize 全为无符号量——凡地址类比较应统一采用无符号版本（`cmp` + `cc/hs` 系列），避免符号位把高地址/大尺寸误判为负数而走错分支。
+
+### 1.4 入口结构
 
 ```asm
 .section ".start","ax"         ← 链接在镜像最前，start: = 第一条指令
@@ -52,7 +72,11 @@ bl __hyp_stub_install          ← HYP mode（ARMv7 VE=EL2 前身）时留 hyp s
 
 **arch-specific linker insertion（256 注释）**：head-sa1100.S 等也声明 `.start`，链接器把 `*(.start)` 拼在 `*(.text)` 前 → 平台补丁代码恰好落在 `.text` 指令处、靠 fall-through 执行；须保 r7/r8/r9。
 
-### 4. 决定内核落点 r4
+---
+
+## 🎯 2. 决定内核落点 r4
+
+### 2.1 AUTO 与非 AUTO 落点
 
 ```asm
 CONFIG_AUTO_ZRELADDR:  r4 = (pc & 0xf8000000) + TEXT_OFFSET   @ 猜 RAM base
@@ -60,10 +84,13 @@ CONFIG_AUTO_ZRELADDR:  r4 = (pc & 0xf8000000) + TEXT_OFFSET   @ 猜 RAM base
 非 AUTO:               r4 = zreladdr（编译期写死）
 ```
 
-- **AUTO 的枷锁**：zImage 必须在 RAM base 起第一格 128MB 内，且 base 最好 128MB 对齐；base 非 0x80000000 也行（任意 128MB 倍数），不对齐则靠 DTB 救（`fdt_check_mem_start`：mask 值落在 memory 区间 → 保留；否则用 DTB 最低 base，round 2MiB；kdump `usable-memory-range` 优先）。追加 DTB 时跳过校验（其 memory 节点不可信）。
+- **AUTO 的约束**：zImage 必须在 RAM base 起的第一格 128MB 内，且 base 最好 128MB 对齐；base 非 0x80000000 也行（任意 128MB 倍数），不对齐则靠 DTB 救（`fdt_check_mem_start`：mask 值落在 memory 区间 → 保留；否则用 DTB 最低 base，round 2MiB；kdump `usable-memory-range` 优先）。追加 DTB 时跳过校验（其 memory 节点不可信）。
 - **非 AUTO**：地址自由，但一个镜像只配一种布局。
 
-### 5. 寄存器账本（restart 前后）
+> [!CAUTION] AUTO 落点放位必须复核
+> `r4 = (pc & 0xf8000000) + TEXT_OFFSET` 是「猜 base」——若 zImage 被放到 RAM base 起第一格 **128MB 之外**，推算出的 r4 落点就是无效地址，可能无声失败。务必把镜像置于 RAM base 首格以内，并尽量让 base 满足 128MB 对齐（不对齐时仰仗 §3 的 DTB 校验兜底）。
+
+### 2.2 寄存器账本（restart 前后）
 
 | reg | 含义 |
 |-----|------|
@@ -74,7 +101,9 @@ CONFIG_AUTO_ZRELADDR:  r4 = (pc & 0xf8000000) + TEXT_OFFSET   @ 猜 RAM base
 | r10 | 镜像地盘尾（bss + stack + heap） |
 | sp  | 栈顶；heap = [sp, sp+64K) 向上，栈向下，背对背 |
 
-### 6. appended DTB 与 ATAGs 合并（ATAG_DTB_COMPAT）
+---
+
+## 🌉 3. appended DTB 与 ATAGs 合并（ATAG_DTB_COMPAT）
 
 流程步骤 7~12：
 
@@ -85,7 +114,14 @@ CONFIG_AUTO_ZRELADDR:  r4 = (pc & 0xf8000000) + TEXT_OFFSET   @ 猜 RAM base
 11. `r9` 虚增 `max(0, _kernel_bss_size − (_edata − wont_overwrite))`：解压产物 r9 不含内核 BSS，BSS 会向上多咬一截，防它碾死 DTB；
 12. 重读真实 totalsize，`r6/r10/sp` 永久 `+r5` 划地盘。
 
-### 13. 撞车判定与 relocate
+> [!WARNING] 追加 DTB 时校验会被跳过
+> 走 appended DTB（合并且追尾）时 `fdt_check_mem_start` 会**跳过 memory 节点校验**，因为该 DTB 的 memory 内容不可信。此时落点完全依赖 §2 的 AUTO 推算：若 RAM base 未按 128MB 对齐又无法复核，很可能直接失败。因此在追加 DTB 的前提下，务必预先让镜像落在合理位置并对齐基址布放。
+
+---
+
+## 🚚 4. 撞车判定与 relocate
+
+### 4.1 豁免在即解压
 
 **豁免（任一成立即原地解压）：**
 
@@ -94,16 +130,22 @@ CONFIG_AUTO_ZRELADDR:  r4 = (pc & 0xf8000000) + TEXT_OFFSET   @ 猜 RAM base
 
 `wont_overwrite` 之上 = 活物（剩余代码 + decompress 函数 + piggy 压缩源），警戒线不许碰；它以下是已执行完的 head 前奏，砸了无所谓。
 
-**撞了 → 搬家：**
+### 4.2 撞了 → 搬家
 
 - 新家 = `r4 + r9 +`（reloc 代码长，256 对齐）← 躲到内核屋顶，且不被自己代码尾踩
 - 拷贝 `[restart↓ .. _edata+DTB]`，从尾到头（`ldmdb/stmdb`，倒序防重叠覆盖）
 - 不拷 BSS/栈/heap（脏数据，新家重建）；ATAGs 已折进 DTB 随之走
 - `mov pc, r0` → 重入 restart：全部坐标基于新地址重算（这就是 restart 存在的意义）
 
-> 注意：搬的永远是壳，`r4` 不动；内核不是"被搬"，是"壳先躲开再压进去"。（真 kernel 的 `relocate_kernel` 是另一回事。）
+> [!CAUTION] relocate 新家须为 reloc 自身留足余量
+> 新家取 `r4 + r9 +`（reloc 代码长，256 对齐），目的是躲到内核屋顶之上**且不被自己代码尾部踩到**。若这段余量过小，重叠区域里拷贝时会覆盖尚未执行的 reloc 指令，跳回新址可能命中半条被覆盖的指令。故「256 对齐」与「躲到内核屋顶」的余量计算不可省略。
 
-### 14. GOT fixup + BSS（壳的 C 运行时铺床）
+> [!NOTE] 搬的是壳，不是内核
+> relocate 搬走的永远是**壳**，`r4` 不动；内核并非「被搬」，而是「壳先躲开、再把自己压进 r4 对应位置」。真 kernel 的 `relocate_kernel` 是另一套逻辑，二者勿混。
+
+---
+
+## ⚙️ 5. GOT fixup + BSS（壳的 C 运行时铺床）
 
 ```asm
 adr LC0 → r1 = LC0 链接值 → sub → delta
@@ -118,7 +160,12 @@ delta == 0 且 r5 == 0 → not_relocated（白捡）
 
 两层 BSS 各清各的：壳的 BSS 这里清；内核的 BSS 由 stext 进门自清（r9 不含它）。
 
-### 15. 解压与交棒
+> [!NOTE] 符号性再次出现
+> 上面「条件短路链」`cmp / cmphs / addhi` 即 §1.3 提醒的无符号比较：`if (a <= x && x < b)` 的地址区间判定全走 `hs`（无符号 ≥）与 `hi`，证地址量统一无符号比较的分量。
+
+---
+
+## 📦 6. 解压与交棒
 
 ```asm
 r0 = r4, r1/r2 = heap[sp, sp+64K), r3 = r7
@@ -130,7 +177,15 @@ cache_off → HYP re-entry 判断 → __enter_kernel → bx r4
 
 壳占的 RAM 无需"释放"：内核从 DTB memory 节点管 memblock，那 5MB 自然回收覆盖。
 
-### 16. XIP（CONFIG_ZBOOT_ROM）对照
+> [!CAUTION] 自制镜像必须维护 piggy 尾 4 字节的权威值
+> `get_inflated_image_size` 读的是 piggy **末尾 4 字节**（构建系统追加的 u32 小端，即解压后大小）。自制/构建镜像若遗漏这 4 字节，r9 会拿到垃圾值，导致第 11 步的 DTB 掩护、§4 的豁免判定与 relocate 全部错位。该尾部字节是解压尺寸的**唯一权威来源**（原文：piggy 是唯一权威）。
+
+> [!WARNING] cache_on 之后必须刷对解压范围
+> 解压写脏的内核须刷回 RAM：`cache_clean_flush` 的作用域要精确对应 `[r4, r4 + 解压真实 size)`。若刷新范围与解压产物实际大小不符，cache 中残留的脏线不落盘，`bx r4` 后执行的是残缺内核。注意此处用的是 `get_inflated_image_size` 重读的真实 size（`r9` 已在第 11 步被虚增以掩护 DTB，不能拿它当 flush 范围）。
+
+---
+
+## 💾 7. XIP（CONFIG_ZBOOT_ROM）对照
 
 |          | PIC（你的板）                 | XIP                                                  |
 |----------|-------------------------------|------------------------------------------------------|
@@ -139,33 +194,27 @@ cache_off → HYP re-entry 判断 → __enter_kernel → bx r4
 | 清 BSS   | 要                            | 照样要（地址对 ≠ 内容是零）                          |
 | 撞车     | 自救                          | 无救济：静默压毁 BSS/栈 → hang，只能靠人工排布 zreladdr/BSS/heap/DTB 不重叠 |
 
-### 17. 常见坑速查
-
-- AUTO 下把 zImage 放到 base+128MB 外 → r4 算出错误地址，无声死机；
-- 追加 DTB 且 base 非 128MB 对齐 → 校验被跳过，必死；
-- 忘追 piggy 尾 4 字节（自制镜像）→ r9 拿到垃圾值，豁免/relocate 全错；
-- relocate 新家不留 reloc 代码余量 → 跳回执行被覆盖的半条指令；
-- cache_on 过而 clean_flush 范围用错 size → 内核残缺，bx r4 炸；
-- blo/bhs 无符号 vs blt/bge 有符号，地址比较一律前者。
+> [!CAUTION] XIP 无撞车救济
+> XIP 路线的 text 锁死在 flash，**不移位也不自救**——若排布冲突，会静默压毁 BSS/栈直至 hang。只能靠人工精心排布 `zreladdr / BSS / heap / DTB` 使之互不重叠，无法靠开机自检兜底。
 
 ---
 
-## 二、ARMv7 CP15 速查表（compressed/head.S 收官笔记）
+## 🧠 8. ARMv7 CP15 速查表（compressed/head.S 收官笔记）
 
 > 目标：i.MX6ULL / Cortex-A7 / zImage 解压壳
 
-### 0. 一句话总纲
+### 8.1 一句话总纲
 
 32 位 ARM 启动 = 把数据摆成硬件查询的形状（页表），把指针和控制位塞进 CP15，最后 ISB 冲掉旧世界的流水线。
 
-### 1. 指令格式
+### 8.2 指令格式
 
 ```asm
 mcr/mrc p15, <op1>, <Rt>, <CRn>, <CRm>, <op2>
                  寄存器号 ──┘        └── 动作编号（查表件，没人背）
 ```
 
-### 2. 柜号地图（CRn，值得记的只有这几个）
+### 8.3 柜号地图（CRn，值得记的只有这几个）
 
 | 柜号 | 寄存器     | 作用                          | 出现位置举例                       |
 |------|------------|-------------------------------|------------------------------------|
@@ -178,7 +227,7 @@ mcr/mrc p15, <op1>, <Rt>, <CRn>, <CRm>, <op2>
 | c7   | cache 操作 | clean/inval/DSB/ISB           | `c7,c10,4`=drain; `c7,c5,4`=ISB   |
 | c8   | TLB 操作   | flush I/D TLB                 | `mcr c8,c7,0`                     |
 
-### 3. SCTLR 位号（唯一值得背的 bit 表）
+### 8.4 SCTLR 位号（唯一值得背的 bit 表）
 
 | bit   | 名  | 作用                                            |
 |-------|-----|-------------------------------------------------|
@@ -189,7 +238,7 @@ mcr/mrc p15, <op1>, <Rt>, <CRn>, <CRm>, <op2>
 | bit22 | U   | v6 非对齐模型（ARM1176 需要）                    |
 | bit28 | TRE | TEX 重映射（清 0 = 用经典 AP 编码）              |
 
-### 4. 页表项格式（section, 32bit）
+### 8.5 页表项格式（section, 32bit）
 
 - `bit[1:0]` = `0b10`：section 类型
 - `bit[31:20]` = `PA[31:20]`：物理 1MB 块号 ← 所以 `add #1048576` = 下 1MB
@@ -199,7 +248,7 @@ mcr/mrc p15, <op1>, <Rt>, <CRn>, <CRm>, <op2>
 
 1:1 恒等映射的目的：不是翻译，是合法持有 C 位 + 解除 XN。
 
-### 5. 点火仪式（__armv7_mmu_cache_on 流程）
+### 8.6 点火仪式（__armv7_mmu_cache_on 流程）
 
 1. `mrc ID_MMFR0` → 测 VMSA → 决定 r6 贴纸 & 是否 `__setup_mmu`
 2. drain write buffer + flush TLB（开表前洗干净的旧账）
@@ -219,13 +268,13 @@ b 1f; .align 5; 1: mcr c1; mrc c1; sub pc, lr, r0, lsr #32
 
 DEBUG 模式故意不 `orr #0x0d` → 不开 MMU，保串口。
 
-### 6. 记不住怎么办
+### 8.7 记不住怎么办
 
 - 编码是查表件：`grep "c7, c10" arch/arm/include/asm/`，注释自带人话
 - 只背三样：柜号地图 c1/c2/c3/c7、SCTLR bit0/2/12、点火顺序（表 → 域 → ISB → M → ISB）
 - 其余信任 head.S 自己的注释 —— 作者也是抄 TRM 的
 
-### 7. 场景速判
+### 8.8 场景速判
 
 | 场景                              | 走法                                                 |
 |-----------------------------------|------------------------------------------------------|
@@ -233,19 +282,20 @@ DEBUG 模式故意不 `orr #0x0d` → 不开 MMU，保串口。
 | MMU 全关冷启动 + RAM              | 走全套，买的是 RAM 窗口的 C 位                       |
 | XIP from NOR（ZBOOT_ROM）         | 全套 + 尾部 2MB 补丁（给 PC 取指，piggy 超出只是慢） |
 
-XIP 省的是"压缩副本暂存 RAM"，解压输出那份 RAM 永远省不掉。
+> [!NOTE] XIP 省的是「暂存」不是「输出」
+> XIP 省掉的是「压缩副本暂存 RAM」这块开销；解压输出那份 RAM 永远省不掉（见 §7 的账本对照）。
 
 ---
 
-## 三、__setup_mmu 详解笔记（续上表，head.S:794-833）
+## 🗃️ 9. __setup_mmu 详解（head.S:794-833）
 
-### 1. 任务定位
+### 9.1 任务定位
 
 纯软件函数（无 CP15），产出物 = RAM 里一本 4096 项页表。"设 MMU"是错觉：写表只是印字典；查字典是后面 `mcr c1` 点火的事。
 
 - 写表（建数据） vs 启用（查表硬件）—— 两步永远分开。
 
-### 2. 开局三件套
+### 9.2 开局三件套
 
 ```asm
 sub  r3, r4, #16384        @ 表放在内核落点前面 16K
@@ -255,7 +305,7 @@ mov  r9, r0, lsr#18, lsl#18  @ RAM 窗口起点 = 表基址向下 1MB 对齐
 add  r10, r9, #0x10000000    @ 窗口 = 256MB（r9 起向上）
 ```
 
-### 3. 主循环：铺满 4GB
+### 9.3 主循环：铺满 4GB
 
 ```asm
 mov  r1, #0x12 | 3<<10   @ 起点: section(0b10) + XN|U + AP=11
@@ -277,7 +327,7 @@ mov  r1, #0x12 | 3<<10   @ 起点: section(0b10) + XN|U + AP=11
 - 全铺的"其他格子"（UART 等外设）默认 XN+uncached = 恰好是外设正确属性；
 - r6 哪来的：`__armv7` 分支 `movne r6, #CB_BITS|0x02`（VMSA 检测后塞的）；老核 r6 = `CB_BITS|0x12`。
 
-### 4. 尾部补丁：给 PC 自己贴 2MB
+### 9.4 尾部补丁：给 PC 自己贴 2MB
 
 ```asm
 orr  r1, r6, #0x04       @ 重拿贴纸+强制B（r1 循环完已绕回，不续用）
@@ -293,7 +343,7 @@ mov  pc, lr              @ = C 的 return，与映射无关
 
 两格 = 两条 1MB 映射，`str` 落下之前映射并不存在（不是"写回"）。
 
-### 5. 补丁给谁用（易混点总清算）
+### 9.5 补丁给谁用（易混点总清算）
 
 - 用户只有两个：① XIP 时壳自己的取指 ② 解压时 `ldr` 读 flash 里的 piggy
 - XN 只拦取指 → 代码必须全在 2MB 内（壳 .text 才几十 KB，够）
@@ -303,7 +353,10 @@ mov  pc, lr              @ = C 的 return，与映射无关
 - 中断：此阶段 I/F 屏蔽、没设 V=1，全程无中断参与
 - RAM 启动（U-Boot 已拷 0x80800000）：PC 也在 RAM 窗口里 → 补丁 = 重复劳动，白写两格（无害）；U-Boot 常已开 cache → 连 `__setup_mmu` 都被 cache_on 检查 skip
 
-### 6. 为什么非得有表才能开 cache
+> [!NOTE] 「白写两格」无害有其前提
+> RAM 启动下尾部补丁属重复劳动（无害白写）的前提，是 PC 已落在主循环 RAM 窗口内；若落点超出该窗口又非 flash 取指场景，补丁段的意义会落空。排布时始终让内核/代码落点保持在 §9.2 的 RAM 窗口管辖范围中是稳妥做法。
+
+### 9.6 为什么非得有表才能开 cache
 
 ARM 上"这次访问走不走 cache"的属性只有两个来源：
 
@@ -312,7 +365,7 @@ ARM 上"这次访问走不走 cache"的属性只有两个来源：
 
 所以 `__setup_mmu` 买的是 C 位，翻译是搭车的恒等函数。收益：uncached QSPI 数十 MB/s ↔ cached L1 —— 解压流的输入/输出速度差几十倍。
 
-### 7. XIP 存在意义（小 RAM 账本）
+### 9.7 XIP 存在意义（小 RAM 账本）
 
 | 路线   | 峰值占 RAM | 组成                        |
 |--------|-----------|-----------------------------|
@@ -320,3 +373,38 @@ ARM 上"这次访问走不走 cache"的属性只有两个来源：
 | XIP    | 8+~1MB    | 解压输出 + 运行时           |
 
 省的是"暂存"，不是"输出"；输出那份 RAM 永远省不掉。现代 distro 全走 RAM 路线，`ZBOOT_ROM` ≈ 博物馆展品，GOT 反向规则/不能 relocate/2MB 补丁 都是它的配套遗产。
+
+---
+
+## ✅ 落地校验清单（Checklist）
+
+> [!SUCCESS] zImage 启动路径必过
+> - [ ] **落点**：AUTO 下 zImage 位于 RAM base 首格 128MB 内且 base 128MB 对齐；判定 `r4` 与 DTB memory 一致
+> - [ ] **约定传参**：U-Boot 按 new-ABI 传 `r0=0 / r1=arch_id(dtb) / r2=atags`，保留 r7/r8/r9
+> - [ ] **appended DTB**：追尾 DTB 的 totalsize 合法、合并且 `r6/r10/sp` 已 `+r5` 划盘；追加时提前校正落点
+> - [ ] **piggy 尾字节**：镜像构建补齐末尾 u32 解压 size（R9 权威来源），非 4 字节对齐字段已手工拼接
+> - [ ] **relocate 余量**：撞车时新家 `r4+r9+`（reloc 长，256 对齐）足量、倒序拷贝不重叠、`r4` 不动
+> - [ ] **无符号比较**：地址/尺寸区间判定统一 `blo/bhs`（无符号），避免 `blt/bge` 符号位误判
+> - [ ] **cache 一致性**：`cache_on` 存在时 `cache_clean_flush` 覆盖 `[r4, r4+真实 size)`；用 `get_inflated_image_size` 而非虚增后的 r9
+> - [ ] **点火顺序**：CP15 按「表 → 域 → ISB → M → ISB」刷写；`__turn_mmu_on` 于 `.idmap.text` 且 `.align 5`
+> - [ ] **XIP 排布**：若用 `ZBOOT_ROM`，`zreladdr/BSS/heap/DTB` 人工排布互不重叠
+
+---
+
+## 🔗 思考与延伸索引
+
+- [[ARM Kernel head.S 内核启动 学习笔记]] — 两幕大戏的第二幕：真正的 `stext` 从无栈裸机手搭页表到高位虚拟跃迁
+- [[ARM Kernel head.S 内核启动 学习笔记]]（§`__create_page_tables`）— 与 `__setup_mmu` 同源的 1:1 恒等 + 高地位映射的完整对照
+- `arch/arm/boot/compressed/head.S` + `misc.c` — decompress 的 bump allocator（`free_mem_ptr`）与 piggy 尾部 size
+- `arch/arm/include/asm/` — CP15 编码注释的本地「人话」来源
+- U-Boot 自解压/`bootz` — 传参契约与 cache_on 是否被跳过的实际排布
+
+---
+
+## 📚 参考资料
+
+1. **Linux 内核源码** — *arch/arm/boot/compressed/head.S*（本笔记主线，lf-6.18.y：PIC、落点、DTB、relocate、cache）.
+2. **Linux 内核源码** — *arch/arm/boot/compressed/misc.c*（`decompress_kernel` 与 bump allocator；piggy 尾部 size 的读取端）.
+3. **ARM** — *ARM Architecture Reference Manual (ARMv7-A/R)*, Appendix / CP15 (p15 c0~c15、SCTLR、TTBR、DACR、cache 操作编码）.
+4. **NXP** — *i.MX6ULL Reference Manual*（Cortex-A7 MPCore、RAM/外设布局与启动地址）.
+5. **Linux 内核** — *`Documentation/arm/`* 与 `arch/arm/boot/compressed/Makefile`（ZBOOT_ROM / CONFIG_AUTO_ZRELADDR / DTB 追加构建）.

@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "kernel/memory/arm mm init.c.md",
+                "file": "kernel/memory/kernel mm视图.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "arm mm init.c"
+              "title": "kernel mm视图"
             }
           }
         ]
@@ -241,20 +241,23 @@
   "lastOpenFiles": [
     "kernel/memory/lowmem 与 highmem.md",
     "kernel/memory/mmu.c kernel起步.md",
-    "kernel/memory/arm mm init.c.md",
-    "kernel/常用寄存器.md",
-    "kernel/memory/完成清单.md",
-    "kernel/memory/页表预分配 mmu.c.md",
+    "kernel/KERNEL SET_UP.md",
     "kernel/kernel 中断系统（ARM32）学习笔记.md",
     "kernel/ARM zImage head.S 启动 学习笔记.md",
+    "kernel/常用寄存器.md",
+    "kernel/arm 汇编 补充.md",
     "kernel/ARM Kernel head.S 内核启动 学习笔记.md",
+    "kernel/init_main.c pid0-pid1 - pid2.md",
+    "kernel/memory/页表预分配 mmu.c.md",
+    "kernel/memory/完成清单.md",
+    "kernel/memory/kernel mm视图.md",
+    "kernel/memory/arm mm init.c.md",
     "English/2026-9-24.md",
     "English/templete.md",
-    "kernel/进程 线程",
+    "kernel/init_main.c",
     "kernel/memory",
     "English/2026-9-23.md",
     "English/2026-9-22.md",
-    "kernel/arm 汇编 补充.md",
     "网络协议/协议核心/IP.md",
     "kernel",
     "网络协议/协议核心/UDP.md",
@@ -270,9 +273,6 @@
     "Learning-log/modbus.md",
     "English",
     "通信和外设协议/I2C.md",
-    "通信和外设协议/Excalidraw/I2C.excalidraw.md",
-    "网络协议/协议核心/TLS.md",
-    "网络协议/协议核心/Socket.md",
     "网络协议/协议核心/TLS/TLS.md.tmp.43228.1789977360033",
     "网络协议/协议核心/FTP.md.tmp.43228.1789977346802",
     "网络协议/协议核心/FTP.md.tmp.43228.1789977289750",
