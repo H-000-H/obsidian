@@ -13,7 +13,7 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "kernel/调度算法/principle/idle.md",
+                "file": "kernel/调度算法/linux/idle.md",
                 "mode": "source",
                 "source": false
               },
@@ -99,7 +99,7 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "kernel/调度算法/principle/idle.md",
+                "file": "kernel/调度算法/linux/idle.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -236,8 +236,9 @@
       "smart-connections:Toggle Footer Connections": false
     }
   },
-  "active": "0cef4903cfdfa278",
+  "active": "3dfd784028f819f6",
   "lastOpenFiles": [
+    "kernel/调度算法/principle/idle.md",
     "kernel/调度算法/principle/cfs.md",
     "kernel/调度算法/linux/idle.md",
     "kernel/调度算法/linux/cfs.md",
@@ -267,7 +268,6 @@
     "网络协议/协议核心/SSH.md",
     "English/2026-9-21.md",
     "English/未命名.canvas",
-    "网络协议/协议核心/DHCP.md",
     "English/未命名.base",
     "Learning-log/未命名.base",
     "English/未命名",
