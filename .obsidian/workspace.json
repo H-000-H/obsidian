@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "kernel/memory/kernel mm视图.md",
+                "file": "kernel/调度算法/principle/idle.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "kernel mm视图"
+              "title": "idle"
             }
           }
         ]
@@ -99,7 +99,7 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "kernel/memory/kernel mm视图.md",
+                "file": "kernel/调度算法/principle/idle.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -236,20 +236,23 @@
       "smart-connections:Toggle Footer Connections": false
     }
   },
-  "active": "dc53a5109e91a7dc",
+  "active": "0cef4903cfdfa278",
   "lastOpenFiles": [
-    "kernel/memory/lowmem 与 highmem.md",
-    "kernel/memory/mmu.c kernel起步.md",
+    "kernel/调度算法/principle/cfs.md",
+    "kernel/调度算法/linux/idle.md",
+    "kernel/调度算法/linux/cfs.md",
+    "kernel/ARM zImage head.S 启动 学习笔记.md",
+    "kernel/ARM Kernel head.S 内核启动 学习笔记.md",
+    "kernel/常用寄存器.md",
     "kernel/KERNEL SET_UP.md",
     "kernel/kernel 中断系统（ARM32）学习笔记.md",
-    "kernel/ARM zImage head.S 启动 学习笔记.md",
-    "kernel/常用寄存器.md",
-    "kernel/arm 汇编 补充.md",
-    "kernel/ARM Kernel head.S 内核启动 学习笔记.md",
     "kernel/init_main.c pid0-pid1 - pid2.md",
+    "kernel/arm 汇编 补充.md",
+    "kernel/memory/kernel mm视图.md",
+    "kernel/memory/mmu.c kernel起步.md",
+    "kernel/memory/lowmem 与 highmem.md",
     "kernel/memory/页表预分配 mmu.c.md",
     "kernel/memory/完成清单.md",
-    "kernel/memory/kernel mm视图.md",
     "kernel/memory/arm mm init.c.md",
     "English/2026-9-24.md",
     "English/templete.md",
@@ -267,11 +270,8 @@
     "网络协议/协议核心/DHCP.md",
     "English/未命名.base",
     "Learning-log/未命名.base",
-    "通信和外设协议/Modbus.md",
     "English/未命名",
-    "Learning-log/modbus.md",
     "English",
-    "通信和外设协议/I2C.md",
     "网络协议/协议核心/TLS/TLS.md.tmp.43228.1789977360033",
     "网络协议/协议核心/FTP.md.tmp.43228.1789977346802",
     "网络协议/协议核心/FTP.md.tmp.43228.1789977289750",
