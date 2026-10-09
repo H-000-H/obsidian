@@ -12,6 +12,7 @@ tags:
   - swiotlb
 status: Completed
 created: 2026-09-30
+kernel: "7.3.0-rc6 (mainline)"
 ---
 
 # 💾 lowmem 与 highmem：32 位内核的地址分界
@@ -64,11 +65,11 @@ created: 2026-09-30
 
 | 变量 | 谁算的 | 含义 |
 |---|---|---|
-| `arm_lowmem_limit` | `adjust_lowmem_bounds()` `mmu.c:1276` | **PA 侧**的分界线 |
-| `high_memory` | `mmu.c:1278` `__va(arm_lowmem_limit-1)+1` | direct map 的顶，**仅此一个用途** |
-| `max_low_pfn / max_pfn` | `find_limits() → zone_sizes_init()` `mm/init.c:111` | zone 划分：`ZONE_NORMAL` vs `ZONE_HIGHMEM` |
+| `arm_lowmem_limit` | `adjust_lowmem_bounds()` `mmu.c:1244` | **PA 侧**的分界线 |
+| `high_memory` | `mmu.c:1246` `__va(arm_lowmem_limit-1)+1` | direct map 的顶，**仅此一个用途** |
+| `max_low_pfn / max_pfn` | `find_limits() → arch_zone_limits_init()` `mm/init.c:110` | zone 划分：`ZONE_NORMAL` vs `ZONE_HIGHMEM` |
 
-`zone_sizes_init()` 里看得很清楚（`mm/init.c:118-121`）：
+`arch_zone_limits_init()` 里看得很清楚（`mm/init.c:113-117`）：
 
 ```c
 max_zone_pfn[ZONE_NORMAL]  = max_low;    // lowmem 的页
@@ -84,9 +85,9 @@ max_zone_pfn[ZONE_HIGHMEM] = max_high;   // 线以上的页
 
 | | **lowmem** | **highmem** |
 |---|---|---|
-| `__va() / phys_to_virt()` | ✅ 线性可算，`memory.h:265` | ❌ 算出来的 VA 越界，无映射 |
-| `virt_to_phys() / __pa()` | ✅ `memory.h:241` | ❌ 反过来 `page_address()` 对它返回 `NULL` |
-| `virt_to_page(kaddr)` | ✅ | ❌（`memory.h:364`，只能 `pfn_to_page`） |
+| `__va() / phys_to_virt()` | ✅ 线性可算，`memory.h:319/329` | ❌ 算出来的 VA 越界，无映射 |
+| `virt_to_phys() / __pa()` | ✅ `memory.h:313/327` | ❌ 反过来 `page_address()` 对它返回 `NULL` |
+| `virt_to_page(kaddr)` | ✅ | ❌（`memory.h:384`，只能 `pfn_to_page`） |
 | `kmalloc()` | ✅ 天然满足 | ❌ 内部要 direct map 地址，默认不从高于 `high_memory` 分配 |
 | `alloc_page()` | ✅ | ✅（拿到 `struct page`，但拿不到内核指针） |
 | `kmap() / kmap_local()` | 不需要 | 唯一访问手段，走 PKMAP/FIXMAP 槽，用完必须 `kunmap` |
@@ -111,7 +112,7 @@ max_zone_pfn[ZONE_HIGHMEM] = max_high;   // 线以上的页
 
 - 驱动拿到一个 highmem 页想做 DMA，必须先 `kmap_atomic()` 借地址，且该槽位不能睡眠、不能嵌套过深。
 - `GFP_KERNEL` 分配普通内存时，Buddy 会**优先考虑低 zone**，避免无谓地用难访问的高页。
-- 早期启动阶段完全不能用 highmem：`memblock_set_current_limit()`（`mmu.c:1794/1302`）把 memblock 分配上限压到 lowmem 内，就是为了让 `early_alloc()` 只会挑"已映射好的物理页"。
+- 早期启动阶段完全不能用 highmem：`memblock_set_current_limit()`（`mmu.c:1760/1270`）把 memblock 分配上限压到 lowmem 内，就是为了让 `early_alloc()` 只会挑"已映射好的物理页"。
 
 > [!WARNING] kmap 槽位的纪律
 > `kmap_atomic()` 走 FIXMAP 槽，槽在中断/原子上下文里**不可睡眠、不可长时间占用**；用完必须立刻 `kunmap_local()` 归还，不可嵌套过深。若在该槽位上睡眠或嵌套过深，会破坏映射一致性甚至 BUG。
@@ -146,7 +147,7 @@ dma_map_page() 只算出 bus address(= PA) 交给设备
 ```
 
 > [!NOTE] swiotlb 只在够不着时才介入
-> 只有 32 位 DMA mask 够不着的 PA，才需要 **swiotlb**：把数据先 `memcpy` 到 lowmem 的 **bounce buffer**。这就是 `swiotlb_init(max_pfn > arm_dma_pfn_limit, ...)`（`arch/arm/mm/init.c:244-246`）干的事——**RAM 超出设备可达范围才启用**。
+> 只有 32 位 DMA mask 够不着的 PA，才需要 **swiotlb**：把数据先 `memcpy` 到 lowmem 的 **bounce buffer**。这就是 `swiotlb_init(max_pfn > arm_dma_pfn_limit, ...)`（`arch/arm/mm/init.c:226`）干的事——**RAM 超出设备可达范围才启用**。
 
 ---
 

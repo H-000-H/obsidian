@@ -12,7 +12,7 @@ tags:
   - 源码精读
 status: Completed
 created: 2026-09-22
-kernel: "6.18.20 (NXP lf-6.18.y)"
+kernel: "7.3.0-rc6 (mainline)"
 arch: arm
 upstream-doc: "[[KERNEL_READING_ORDER#阶段 1：启动流程（最适合作为第一条线）]]"
 ---
@@ -32,12 +32,12 @@ upstream-doc: "[[KERNEL_READING_ORDER#阶段 1：启动流程（最适合作为�
 
 ## 🧭 1. 运行环境：为什么这段代码"一步走错就变砖"
 
-调用点 `init/main.c:932`：`setup_arch(&command_line);` —— 位于 `start_kernel()` 内相当靠前的位置（`pr_notice(linux_banner)` 之后、`sched_init()` 之前）。
+调用点 `init/main.c:1175`：`setup_arch(&command_line);` —— 位于 `start_kernel()` 内相当靠前的位置（`pr_notice(linux_banner)` 之后、`sched_init()` 之前）。
 
 | 约束 | 具体状态 | 后果 |
 | --- | --- | --- |
-| **无 Slab / 无伙伴系统** | `kmem_cache_init()` 要到 `mm/mm_init.c:2708` 才被调用，晚整个 `setup_arch` | `kmalloc()` 一律不可用；分配物理页只能用 `early_alloc()`（即 memblock） |
-| **memblock 自身也还没完全可用** | `memblock_set_current_limit()` 迟至 `arch/arm/mm/mmu.c:1794` 才设 | `paging_init()` 前半段连 memblock 分配都不能用，只能碰**预先存在**的 `bm_pte` 静态页 |
+| **无 Slab / 无伙伴系统** | `kmem_cache_init()` 要到 `mm/mm_init.c:2672` 才被调用，晚整个 `setup_arch` | `kmalloc()` 一律不可用；分配物理页只能用 `early_alloc()`（即 memblock） |
+| **memblock 自身也还没完全可用** | `memblock_set_current_limit()` 迟至 `arch/arm/mm/mmu.c:1760` 才设 | `paging_init()` 前半段连 memblock 分配都不能用，只能碰**预先存在**的 `bm_pte` 静态页 |
 | **单核** | 次核尚未唤醒 | `smp_build_mpidr_hash()` 只是算参数，真正用它的代码跑在 `head.S` 的次核入口 |
 | **临时映射存活范围极小** | `head.S` 只保证了内核镜像 + 第一个 DRAM bank 的映射 | 解引用未映射地址 = 立即 Data Abort，且此时**连处理 Abort 所需的向量表都还没映射**（向量表在 `devicemaps_init()` 才建）→ 死循环 |
 | **MMU 已开、但权限模型粗** | 全程 Section（1MB）粒度 | 见下方 [[#6. 阶段 3：物理测量与主页表]] 中 `map_kernel()` 一节 |
@@ -62,7 +62,7 @@ flowchart TD
     G --> H["⑥ 设备树 + 重启钩子<br/>unflatten_device_tree :1197"]
     H --> I["⑦ 多核与特权级<br/>arm_dt_init_cpu_maps :1199<br/>hyp_mode_check :1215"]
     I --> J["⑧ 避难所 + 厂商钩子<br/>reserve_crashkernel :1217<br/>mdesc init_early :1225"]
-    J --> K["返回 start_kernel<br/>→ mm_core_init main.c:971"]
+    J --> K["返回 start_kernel<br/>→ mm_core_init main.c:1232"]
 ```
 
 | # | 调用 | 行号 | 常见文档 | 备注 |
@@ -79,7 +79,7 @@ flowchart TD
 | 9 | **`strscpy(cmd_line, boot_command_line)` + `*cmdline_p`** | `:1163-1164` | 漏 | `setup_arch()` 唯一的"输出参数" |
 | 10 | `early_fixmap_init()` | `:1166` | ✔ | |
 | 11 | `early_ioremap_init()` | `:1167` | ✔ | |
-| 12 | `parse_early_param()` | `:1169` | ✔ | 注意通用层在 `init/main.c:947` **又调了一次** |
+| 12 | `parse_early_param()` | `:1169` | ✔ | 注意通用层在 `init/main.c:1204` **又调了一次** |
 | 13 | **`early_mm_init(mdesc)`** | `:1172` | **漏** | 内含 `build_mem_type_table()`，必须在算边界之前 |
 | 14 | **`setup_dma_zone(mdesc)`** | `:1174` | **漏** | 定 `arm_dma_limit` |
 | 15 | **`xen_early_init()` / `arm_efi_init()`** | `:1175-1176` | **漏** | ARM32 上二者通常是空桩 |
@@ -105,14 +105,14 @@ flowchart TD
 
 ### 3.1 `arm_lowmem_limit` 的运行时推导
 
-`arm_lowmem_limit` **不是编译期常数**，由 `adjust_lowmem_bounds()` 运行时计算（`arch/arm/mm/mmu.c:1210`）：
+`arm_lowmem_limit` **不是编译期常数**，由 `adjust_lowmem_bounds()` 运行时计算（`arch/arm/mm/mmu.c:1178`）：
 
 ```c
 vmalloc_limit = (u64)VMALLOC_END - vmalloc_size - VMALLOC_OFFSET -
                 PAGE_OFFSET + PHYS_OFFSET;
 ```
 
-> `arch/arm/mm/mmu.c:1223-1224`
+> `arch/arm/mm/mmu.c:1191-1192`
 
 代入本仓库常量：
 
@@ -120,7 +120,7 @@ vmalloc_limit = (u64)VMALLOC_END - vmalloc_size - VMALLOC_OFFSET -
 | --- | --- | --- |
 | `VMALLOC_END` | `0xff800000`（硬编码） | `arch/arm/include/asm/pgtable.h:51` |
 | `PAGE_OFFSET` | `UL(CONFIG_PAGE_OFFSET)` —— **随 `VMSPLIT_*` 配置而变**，默认 `0xc0000000` | `arch/arm/include/asm/memory.h:34`；`arch/arm/Kconfig:1030-1036` |
-| `vmalloc_size` 默认 | `240 * SZ_1M` | `arch/arm/mm/mmu.c:1178` |
+| `vmalloc_size` 默认 | `240 * SZ_1M` | `arch/arm/mm/mmu.c:1146` |
 | `VMALLOC_OFFSET` | `8*1024*1024`（8MB 保护带） | `arch/arm/include/asm/pgtable.h:49` |
 
 默认 3G/1G 切分下（`PAGE_OFFSET = 0xc0000000`）：
@@ -147,18 +147,18 @@ $$
 > 正确推导是 `0xff800000 − 768MB(3G/1G 下)…` 即 **1016 − 240 − 8 = 768MB**。这是因为 `VMALLOC_END` 顶端留了 8MB（所以不是 1024MB），且还要再扣掉 `VMALLOC_OFFSET` 的 **8MB 保护带**。任何"1024 − 240 = 784"的口算是漏掉了这 8MB 保护带的误算。最稳妥的口径是**记住公式，别记数字**：换 `VMSPLIT` 或加 `vmalloc=` 都会移动这条线。这也是 ARM32 上"大内存板子要么上 LPAE、要么把 `PAGE_OFFSET` 往下调、要么接受 HIGHMEM 映射开销"的根因。
 
 > [!NOTE] `vmalloc_size` 可调
-> `vmalloc=` 参数由 `early_vmalloc()` 解析，注册在 `arch/arm/mm/mmu.c:1206`（`early_param`）。改大 vmalloc 会**压低** lowmem 上限。nommu 配置下 `VMALLOC_END = 0xffffffff`（`asm/pgtable-nommu.h:63`），整套逻辑不适用。
+> `vmalloc=` 参数由 `early_vmalloc()` 解析，注册在 `arch/arm/mm/mmu.c:1174`（`early_param`）。改大 vmalloc 会**压低** lowmem 上限。nommu 配置下 `VMALLOC_END = 0xffffffff`（`asm/pgtable-nommu.h:63`），整套逻辑不适用。
 
 ### 3.2 边界计算里两个容易忽略的细节
 
-1. **首个 bank 起始必须 PMD 对齐**，否则内核把开头一段标成 `NOMAP`（`mmu.c:1230-1238` `memblock_mark_nomap`）。源码注释解释原因（`:1259-1264`）：映射 bank 0 的开头时**还没有任何空闲内存可分配**，所以 bank 0 起点必须段对齐。
+1. **首个 bank 起始必须 PMD 对齐**，否则内核把开头一段标成 `NOMAP`（`mmu.c:1198-1206` `memblock_mark_nomap`）。源码注释解释原因（`:1227-1232`）：映射 bank 0 的开头时**还没有任何空闲内存可分配**，所以 bank 0 起点必须段对齐。
 
-2. **`memblock_limit` 还会把可用量再压低一截**（`mmu.c:1266-1271`，向下取整到 PMD `:1280-1286`）。第一个非 PMD 对齐的页会成为分配上限，也就是说"能分配的"往往小于"能映射的"。
+2. **`memblock_limit` 还会把可用量再压低一截**（`mmu.c:1234-1239`，向下取整到 PMD `:1248-1254`）。第一个非 PMD 对齐的页会成为分配上限，也就是说"能分配的"往往小于"能映射的"。
 
 **产出**：
 
-- `arm_lowmem_limit`（`mmu.c:1276`）—— 物理地址，**高于此线的 DRAM 归 `ZONE_HIGHMEM`**。
-- `high_memory = __va(arm_lowmem_limit - 1) + 1`（`mmu.c:1278`）—— 虚拟侧界标，`mem_high()`/`pfn_to_page` 合法性判断依赖它。
+- `arm_lowmem_limit`（`mmu.c:1244`）—— 物理地址，**高于此线的 DRAM 归 `ZONE_HIGHMEM`**。
+- `high_memory = __va(arm_lowmem_limit - 1) + 1`（`mmu.c:1246`）—— 虚拟侧界标，`mem_high()`/`pfn_to_page` 合法性判断依赖它。
 
 ---
 
@@ -215,17 +215,17 @@ list = lookup_processor(midr)                 :734
 | --- | --- | --- |
 | `name` | `arch.h:26` | `setup.c:1154` `machine_name` |
 | `dt_compat` | `arch.h:28` | `devtree.c:181` 匹配 |
-| `dma_zone_size` | `arch.h:34` | 经 `setup_dma_zone()`，`mm/init.c:104-106` |
+| `dma_zone_size` | `arch.h:34` | 经 `setup_dma_zone()`，`mm/init.c:103-106` |
 | `video_start`/`video_end` | `arch.h:37-38` | `setup.c:938-940` |
 | `reserve_lp0/1/2` | `arch.h:40-42` | `setup.c:948-952` |
 | `reboot_mode` | `arch.h:43` | `setup.c:1157-1158` |
 | `smp` / `smp_init` | `arch.h:47-48` | `setup.c:1206-1207` / `:1203` |
-| `map_io` | `arch.h:53` | **经 `paging_init`→`devicemaps_init`**，`mmu.c:1469-1470` |
+| `map_io` | `arch.h:53` | **经 `paging_init`→`devicemaps_init`**，`mmu.c:1437-1438` |
 | `init_early` | `arch.h:54` | `setup.c:1225-1226` |
 | `init_irq` / `init_time` | `arch.h:55-56` | **不在 `setup_arch`**，在 `arch/arm/kernel/irq.c:133` 与 `time.c:90` |
 | `init_machine` / `init_late` | `arch.h:57-58` | **不在 `setup_arch`**，走 initcall：`setup.c:975-976` / `:987-988` |
 | `restart` | `arch.h:59` | `setup.c:1192-1193` |
-| `reserve` | `arch.h:52` | `mm/init.c:197-198`（`arm_memblock_init`） |
+| `reserve` | `arch.h:52` | `mm/init.c:190-191`（`arm_memblock_init`） |
 
 > [!NOTE] 已删除字段
 > `phys_io`、`io_pg_offst`、`nr_irqs`、`nr_dram_bases`、`nr_dram_sizes`、`dram_bank` 在本树 `arch/arm/` 下**全仓库零命中**。内存布局改由 DT + `arm_add_memory()`（`setup.c:791`）提供。老文档若还在讲 `MAP_BASE`/`PHYS_IO` 就过期了。
@@ -249,70 +249,70 @@ list = lookup_processor(midr)                 :734
 
 ## ⚙️ 5. 阶段 2：早期参数与微型映射
 
-### 5.1 `early_fixmap_init()` — `arch/arm/mm/mmu.c:396`
+### 5.1 `early_fixmap_init()` — `arch/arm/mm/mmu.c:368`
 
 ```c
 pmd = fixmap_pmd(FIXADDR_TOP);
-pmd_populate_kernel(&init_mm, pmd, bm_pte);   /* :408 */
-pte_offset_fixmap = pte_offset_early_fixmap;  /* :410 */
+pmd_populate_kernel(&init_mm, pmd, bm_pte);   /* :380 */
+pte_offset_fixmap = pte_offset_early_fixmap;  /* :382 */
 ```
 
 > [!IMPORTANT] 为什么这一小段值得读
-> `bm_pte` 是**编译期就存在的静态页表页**。此时 memblock 还没设 current limit、任何分配都可能踩到未映射内存，所以早期 fixmap **不允许触发分配**——只能把一个已经躺在 `.bss` 里的 PTE 页挂上去。`:404-405` 的 `BUILD_BUG_ON` 也在强制"早期 fixmap 区间必须落在同一个 PMD 内"，因为一张 `bm_pte` 装不下跨 PMD 的范围。
+> `bm_pte` 是**编译期就存在的静态页表页**。此时 memblock 还没设 current limit、任何分配都可能踩到未映射内存，所以早期 fixmap **不允许触发分配**——只能把一个已经躺在 `.bss` 里的 PTE 页挂上去。`:376-377` 的 `BUILD_BUG_ON` 也在强制"早期 fixmap 区间必须落在同一个 PMD 内"，因为一张 `bm_pte` 装不下跨 PMD 的范围。
 
-`early_ioremap_init()` 在 `arch/arm/mm/ioremap.c:517`，用固定槽位 + 忙/闲位图提供成对的临时映射（`set_fixmap` 走 `mmu.c:418` `__set_fixmap`）。
+`early_ioremap_init()` 在 `arch/arm/mm/ioremap.c:517`，用固定槽位 + 忙/闲位图提供成对的临时映射（`set_fixmap` 走 `mmu.c:390` `__set_fixmap`）。
 
 ### 5.2 `parse_early_param()` — 注册在 ARM 侧的 `early_param`
 
 | 参数 | 处理函数 | 注册位置 |
 | --- | --- | --- |
 | `mem=` | `early_mem` | `arch/arm/kernel/setup.c:884` |
-| `vmalloc=` | `early_vmalloc` | `arch/arm/mm/mmu.c:1206` |
-| `cachepolicy=` | `early_cachepolicy` | `arch/arm/mm/mmu.c:192`（nommu 版 `:231`） |
-| `nocache=` | `early_nocache` | `arch/arm/mm/mmu.c:201` |
-| `nowb=` | `early_nowrite` | `arch/arm/mm/mmu.c:210` |
-| `ecc=` | `early_ecc` | `arch/arm/mm/mmu.c:221` |
+| `vmalloc=` | `early_vmalloc` | `arch/arm/mm/mmu.c:1174` |
+| `cachepolicy=` | `early_cachepolicy` | `arch/arm/mm/mmu.c:134`（nommu 版 `:205`） |
+| `nocache=` | `early_nocache` | `arch/arm/mm/mmu.c:173` |
+| `nowb=` | `early_nowrite` | `arch/arm/mm/mmu.c:182` |
+| `ecc=` | `early_ecc` | `arch/arm/mm/mmu.c:192` |
 | `coherent_pool=` | `early_coherent_pool` | `arch/arm/mm/dma-mapping.c:195` |
 | `earlyprintk=` | `setup_early_printk` | `arch/arm/kernel/early_printk.c:47` |
 
-`earlycon` 属通用层（`drivers/tty/serial/earlycon.c`）。注意 `parse_early_param()` 会被调用**两次**：本处 `setup.c:1169`，以及 `init/main.c:947`。
+`earlycon` 属通用层（`drivers/tty/serial/earlycon.c`）。注意 `parse_early_param()` 会被调用**两次**：本处 `setup.c:1169`，以及 `init/main.c:1204`。
 
-### 5.3 `early_mm_init()` — `mmu.c:1818`，`setup.c:1172` 调用
+### 5.3 `early_mm_init()` — `mmu.c:1778`，`setup.c:1172` 调用
 
 ```c
-build_mem_type_table();      /* mmu.c:1820 → 定义在 mmu.c:463 */
-early_paging_init(mdesc);    /* mmu.c:1821 → LPAE 版 :1654 / 空桩版 :1728 */
+build_mem_type_table();      /* mmu.c:1780 → 定义在 mmu.c:435 */
+early_paging_init(mdesc);    /* mmu.c:1781 → LPAE 版 :1654 / 空桩版 :1728 */
 ```
 
 `build_mem_type_table()` 根据 CPU 架构与 `cachepolicy=` 生成 `mem_types[]`（`MT_DEVICE`/`MT_MEMORY_RW`/`MT_HIGH_VECTORS`… 的属性位），**必须在 `paging_init` 之前完成**，否则后面所有 `create_mapping()` 都拿不到正确的 PTE 属性。这是"为什么 `early_mm_init` 排在算边界前面"的答案。
 
-`setup_dma_zone()`（`arch/arm/mm/init.c:101`）在 `CONFIG_ZONE_DMA` 下由 `mdesc->dma_zone_size` 定 `arm_dma_limit = PHYS_OFFSET + size - 1`（`:106`），未给则放宽到 `0xffffffff`（`:108`）。
+`setup_dma_zone()`（`arch/arm/mm/init.c:98`）在 `CONFIG_ZONE_DMA` 下由 `mdesc->dma_zone_size` 定 `arm_dma_limit = PHYS_OFFSET + size - 1`（`:103`），未给则放宽到 `0xffffffff`（`:105`）。
 
 ---
 
 ## 🏗️ 6. 阶段 3：物理测量与主页表
 
-### 6.1 `arm_memblock_init()` — `arch/arm/mm/init.c:187`
+### 6.1 `arm_memblock_init()` — `arch/arm/mm/init.c:180`
 
 严格按序：
 
 | 步 | 动作 | 行号 |
 | --- | --- | --- |
-| 1 | `memblock_reserve(__pa(KERNEL_START), KERNEL_END - KERNEL_START)` 登记内核镜像 | `:190` |
-| 2 | `reserve_initrd_mem()` 登记 initrd | `:192` |
-| 3 | **`arm_mm_memblock_reserve()` 登记页表本身** | `:194` |
-| 4 | `mdesc->reserve()` 板级自定义保留 | `:197-198` |
-| 5 | `early_init_fdt_scan_reserved_mem()` 解析 DT `reserved-memory` 节点 | `:200` |
-| 6 | `dma_contiguous_reserve(arm_dma_limit)` 预留 CMA | `:203` |
-| 7 | `arm_memblock_steal_permitted = false` 关闭"偷内存"权限 | `:205` |
-| 8 | `memblock_dump_all()` 打印 | `:206` |
+| 1 | `memblock_reserve(__pa(KERNEL_START), KERNEL_END - KERNEL_START)` 登记内核镜像 | `:183` |
+| 2 | `reserve_initrd_mem()` 登记 initrd | `:185` |
+| 3 | **`arm_mm_memblock_reserve()` 登记页表本身** | `:187` |
+| 4 | `mdesc->reserve()` 板级自定义保留 | `:190-191` |
+| 5 | `early_init_fdt_scan_reserved_mem()` 解析 DT `reserved-memory` 节点 | `:193` |
+| 6 | `dma_contiguous_reserve(arm_dma_limit)` 预留 CMA | `:196` |
+| 7 | `arm_memblock_steal_permitted = false` 关闭"偷内存"权限 | `:198` |
+| 8 | `memblock_dump_all()` 打印 | `:199` |
 
 > [!NOTE] 第 3 步是常见文档漏掉的关键
-> `arm_mm_memblock_reserve()`（`arch/arm/mm/mmu.c:1367`）执行 `memblock_reserve(__pa(swapper_pg_dir), SWAPPER_PG_DIR_SIZE)`（`:1373`）。因为 `swapper_pg_dir` 位于内核 BSS，**若这里不登记，`paging_init()` 分配的页表会和已有页表重叠**。`SWAPPER_PG_DIR_SIZE` 在 LPAE 下含 PMD 表：`mmu.c:1356-1362`。
+> `arm_mm_memblock_reserve()`（`arch/arm/mm/mmu.c:1335`）执行 `memblock_reserve(__pa(swapper_pg_dir), SWAPPER_PG_DIR_SIZE)`（`:1341`）。因为 `swapper_pg_dir` 位于内核 BSS，**若这里不登记，`paging_init()` 分配的页表会和已有页表重叠**。`SWAPPER_PG_DIR_SIZE` 在 LPAE 下含 PMD 表：`mmu.c:1324-1330`。
 
-`arm_memblock_steal()`（`init.c:154-169`）是"分配后立即 `memblock_remove`"的偷取原语，`:158` 的 `BUG_ON` 配合第 7 步：一旦越过 `arm_memblock_init`，任何偷内存行为直接 panic。
+`arm_memblock_steal()`（`init.c:147-162`）是"分配后立即 `memblock_remove`"的偷取原语，`:151` 的 `BUG_ON` 配合第 7 步：一旦越过 `arm_memblock_init`，任何偷内存行为直接 panic。
 
-### 6.2 `paging_init()` — `arch/arm/mm/mmu.c:1780`（本树 12 个子步骤）
+### 6.2 `paging_init()` — `arch/arm/mm/mmu.c:1748`（本树 11 个子步骤）
 
 > [!WARNING] 注意：ARM32 的直映射是「同一张表原地扩建」，不存在"页表切换"
 > `swapper_pg_dir` 从 `head.S` 一开始就被加载进 TTBR1，`paging_init()` 全程复用这张表，只是在上面**原地扩建**：`prepare_page_table()` 先擦掉不该留的段，`map_lowmem()`/`map_kernel()` 再把完整的直映射填回去，CPU 全程不换表。证据链：
@@ -320,72 +320,73 @@ early_paging_init(mdesc);    /* mmu.c:1821 → LPAE 版 :1654 / 空桩版 :1728 
 > - `arch/arm/kernel/head.S:139` — `bl __create_page_tables`（汇编直接把表项写进 `swapper_pg_dir`）
 > - `arch/arm/kernel/head.S:167` — `mov r8, r4 @ set TTBR1 to swapper_pg_dir`
 >
-> 只有 `CONFIG_ARM_LPAE` + 物理地址高于 4G 的特殊场景（`early_paging_init()`，`arch/arm/mm/mmu.c:1654`）才存在真正的页表重建与跳转。**对比 x86-16 位/64 位早期"临时页表 → 最终页表"的两段式，ARM32 是一段式原地生长。**
+> 只有 `CONFIG_ARM_LPAE` + 物理地址高于 4G 的特殊场景（`early_paging_init()`，`arch/arm/mm/mmu.c:1622`）才存在真正的页表重建与跳转。**对比 x86-16 位/64 位早期"临时页表 → 最终页表"的两段式，ARM32 是一段式原地生长。**
 
 ```mermaid
 flowchart TD
-    P1["prepare_page_table()<br/>擦除非法残留映射"] --> P2["map_lowmem()<br/>建 DRAM 直映射<br/>mmu.c:1502"]
-    P2 --> P3["memblock_set_current_limit<br/>mmu.c:1794<br/>★分配器从此刻可用"]
-    P3 --> P4["map_kernel()<br/>内核段 RWX/RW 分离<br/>mmu.c:1585"]
-    P4 --> P5["dma_contiguous_remap()<br/>CMA 落位 :1801"]
-    P5 --> P6["early_fixmap_shutdown()<br/>早期映射搬家 :1747"]
-    P6 --> P7["devicemaps_init()<br/>向量表 0xffff0000 :1391"]
-    P7 --> P8["kmap_init() :1804<br/>tcm_init() :1805"]
-    P8 --> P9["top_pmd = pmd_off_k(0xffff0000) :1807"]
-    P9 --> P10["early_alloc(PAGE_SIZE)<br/>= zero page :1810"]
-    P10 --> P11["bootmem_init() :1812"]
-    P11 --> P12["empty_zero_page +<br/>flush dcache :1814-15"]
+    P1["prepare_page_table()<br/>擦除非法残留映射"] --> P2["map_lowmem()<br/>建 DRAM 直映射<br/>mmu.c:1470"]
+    P2 --> P3["memblock_set_current_limit<br/>mmu.c:1760<br/>★分配器从此刻可用"]
+    P3 --> P4["map_kernel()<br/>内核段 RWX/RW 分离<br/>mmu.c:1553"]
+    P4 --> P5["dma_contiguous_remap()<br/>CMA 落位 :1767"]
+    P5 --> P6["early_fixmap_shutdown()<br/>早期映射搬家 :1715"]
+    P6 --> P7["devicemaps_init()<br/>向量表 0xffff0000 :1359"]
+    P7 --> P8["kmap_init() :1770"]
+    P8 --> P9["tcm_init() :1771"]
+    P9 --> P10["top_pmd = pmd_off_k(0xffff0000) :1773"]
+    P10 --> P11["bootmem_init() :1775"]
 ```
 
-#### `prepare_page_table()`（`mmu.c:1305`，函数体到 `:1354`）：先拆后建
+> [!NOTE] 7.3.0 的 `paging_init()` 已不再包含 zero page 的 `early_alloc(PAGE_SIZE)` / `flush_dcache_page()` 两步，改由 `mm_core_init()` 的 `init_zero_page_pfn()`（`mm/mm_init.c:2646`）完成。
 
-把 `MODULES`～`PAGE_OFFSET`（`:1337-1338`）以及"第一个 lowmem block 末尾 ～ `VMALLOC_START`"（`:1351-1353`）之间的 PMD 全清掉，**但保留第一个 DRAM bank 与内核映射**——否则清完当场就不认识自己了。
+#### `prepare_page_table()`（`mmu.c:1273`，函数体到 `:1322`）：先拆后建
 
-#### `map_lowmem()`（`mmu.c:1502`）：六种 kernel 落位情形
+把 `MODULES`～`PAGE_OFFSET`（`:1305-1306`）以及"第一个 lowmem block 末尾 ～ `VMALLOC_START`"（`:1319-1321`）之间的 PMD 全清掉，**但保留第一个 DRAM bank 与内核映射**——否则清完当场就不认识自己了。
 
-`for_each_mem_range` 遍历 DRAM，`end` 被 `arm_lowmem_limit` 夹住（`:1513-1514`），然后按"内核镜像是否落在该 range 内"分六种情形处理（源码 ASCII 图 `:1518-1540`，代码 `:1542-1576`）：Case 6（内核嵌在 range 中间）会拆成两段映射（`:1549-1562`），Case 5（内核覆盖整个 range）直接 `break`（`:1543-1544`）。
+#### `map_lowmem()`（`mmu.c:1470`）：六种 kernel 落位情形
+
+`for_each_mem_range` 遍历 DRAM，`end` 被 `arm_lowmem_limit` 夹住（`:1481-1482`），然后按"内核镜像是否落在该 range 内"分六种情形处理（源码 ASCII 图 `:1486-1508`，代码 `:1510-1544`）：Case 6（内核嵌在 range 中间）会拆成两段映射（`:1517-1530`），Case 5（内核覆盖整个 range）直接 `break`（`:1511-1512`）。
 
 #### `map_kernel()`：段粒度带来的"暂时不安全"
 
-`map_kernel()`（`mmu.c:1585-1644`）在 `__pa(__init_end)` 处向上取整到段边界（`:1612`），把内核切成 **RWX 段**（`:1629-1633`，`MT_MEMORY_RWX`）与 **RW 段**（`:1639-1643`，`MT_MEMORY_RW`）。
+`map_kernel()`（`mmu.c:1553-1612`）在 `__pa(__init_end)` 处向上取整到段边界（`:1580`），把内核切成 **RWX 段**（`:1597-1601`，`MT_MEMORY_RWX`）与 **RW 段**（`:1607-1611`，`MT_MEMORY_RW`）。
 
-> [!WARNING] 源码原话（`mmu.c:1602-1606`）
+> [!WARNING] 源码原话（`mmu.c:1570-1574`）
 > *"we are dealing with section sized mappings here so all of this will be bumped to the closest section boundary. This means that **some of the non-executable part of the kernel memory is actually mapped as executable**. This will only persist until we turn on proper memory management later on and we remap the whole kernel with page granularity."*
 >
-> 即：内核文本段的 WX 窗口**在 `setup_arch` 期间是已知且被接受的**，真正的 W^X 收紧发生在后续 `vmalloc_init()`/只读化（`mm/mm_init.c:2718`）之后。
+> 即：内核文本段的 WX 窗口**在 `setup_arch` 期间是已知且被接受的**，真正的 W^X 收紧发生在后续 `vmalloc_init()`/只读化（`mm/mm_init.c:2682`）之后。
 
-#### `early_fixmap_shutdown()`（`mmu.c:1747-1774`）：搬家而非删除
+#### `early_fixmap_shutdown()`（`mmu.c:1715-1742`）：搬家而非删除
 
-`:1752` 把 `pte_offset_fixmap` 换成 `pte_offset_late_fixmap`，`:1753-1754` 清掉早期 PMD 并 flush；随后 `:1756-1773` 遍历所有永久 fix 槽位，**只对 `L_PTE_MT_DEV_SHARED` 的设备映射重新 `create_mapping()`**（`:1763-1766`）。这解释了 `early_ioremap_reset()` 为什么能安全地排在 `paging_init` 之前。
+`:1720` 把 `pte_offset_fixmap` 换成 `pte_offset_late_fixmap`，`:1721-1722` 清掉早期 PMD 并 flush；随后 `:1724-1741` 遍历所有永久 fix 槽位，**只对 `L_PTE_MT_DEV_SHARED` 的设备映射重新 `create_mapping()`**（`:1731-1734`）。这解释了 `early_ioremap_reset()` 为什么能安全地排在 `paging_init` 之前。
 
-#### `devicemaps_init()`（`mmu.c:1391-1489`）—— 最危险的一步
+#### `devicemaps_init()`（`mmu.c:1359-1457`）—— 最危险的一步
 
-> [!DANGER] `mmu.c:1384-1390`
+> [!DANGER] `mmu.c:1352-1357`
 > *"Since we clear out the page tables for all mappings above VMALLOC_START, except early fixmap, we might remove debug device mappings. This means **earlycon can be used to debug this function**. Any other function or debugging method which may touch any device _will_ crash the kernel."*
 
 建图顺序：
 
 | 步 | 内容 | 行号 |
 | --- | --- | --- |
-| 1 | `vectors = early_alloc(PAGE_SIZE * 2)` 分配向量页 + `early_trap_init(vectors)` | `:1400`、`:1402` |
-| 2 | 清 `VMALLOC_START` → `FIXADDR_TOP & PMD_MASK` 之间的 PMD，**保留 early fixmap 那一页 PMD** | `:1404-1408` |
-| 3 | DTB 只读映射：`FDT_FIXED_BASE` + `MT_MEMORY_RO` | `:1410-1417` |
-| 4 | cache 清洗区 `FLUSH_BASE` / `FLUSH_BASE_MINICACHE`（老核） | `:1422-1435` |
-| 5 | **高端异常向量表 `0xffff0000`**；`CONFIG_KUSER_HELPERS` 时 `MT_HIGH_VECTORS` 否则 `MT_LOW_VECTORS` | `:1442-1450` |
-| 6 | 非 high-vectors 时同时在 `0x00000000` 建别名 | `:1452-1457` |
-| 7 | `0xffff1000` 内核只读页 | `:1459-1464` |
-| 8 | `mdesc->map_io()`，无则 `debug_ll_io_init()` | `:1469-1472` |
-| 9 | `fill_pmd_gaps()`（定义 `mmu.c:1100`）填洞 | `:1473` |
-| 10 | `pci_reserve_io()` 在 vmalloc 区保留 IO 空间 | `:1476` |
-| 11 | `local_flush_tlb_all()` + `flush_cache_all()` | `:1484-1485` |
-| 12 | `early_abt_enable()` **打开异步 abort** | `:1488` |
+| 1 | `vectors = early_alloc(PAGE_SIZE * 2)` 分配向量页 + `early_trap_init(vectors)` | `:1368`、`:1370` |
+| 2 | 清 `VMALLOC_START` → `FIXADDR_TOP & PMD_MASK` 之间的 PMD，**保留 early fixmap 那一页 PMD** | `:1372-1376` |
+| 3 | DTB 只读映射：`FDT_FIXED_BASE` + `MT_MEMORY_RO` | `:1378-1385` |
+| 4 | cache 清洗区 `FLUSH_BASE` / `FLUSH_BASE_MINICACHE`（老核） | `:1390-1403` |
+| 5 | **高端异常向量表 `0xffff0000`**；`CONFIG_KUSER_HELPERS` 时 `MT_HIGH_VECTORS` 否则 `MT_LOW_VECTORS` | `:1410-1418` |
+| 6 | 非 high-vectors 时同时在 `0x00000000` 建别名 | `:1420-1425` |
+| 7 | `0xffff1000` 内核只读页 | `:1427-1432` |
+| 8 | `mdesc->map_io()`，无则 `debug_ll_io_init()` | `:1437-1440` |
+| 9 | `fill_pmd_gaps()`（定义 `mmu.c:1070`）填洞 | `:1441` |
+| 10 | `pci_reserve_io()` 在 vmalloc 区保留 IO 空间 | `:1444` |
+| 11 | `local_flush_tlb_all()` + `flush_cache_all()` | `:1452-1453` |
+| 12 | `early_abt_enable()` **打开异步 abort** | `:1456` |
 
 > [!TIP] 第 12 步的深意
-> `early_abt_enable()`（`:1488`）此前内核一直屏蔽 SError。注释 `:1478-1482` 说明：刷 TLB/cache 保证写缓冲一致，**"After this point, we can start to touch devices again"**——只有向量表就位、能真正处理异常了，才敢放开异步 abort。
+> `early_abt_enable()`（`:1456`）此前内核一直屏蔽 SError。注释 `:1446-1450` 说明：刷 TLB/cache 保证写缓冲一致，**"After this point, we can start to touch devices again"**——只有向量表就位、能真正处理异常了，才敢放开异步 abort。
 
 #### 收尾
 
-`kmap_init()`（`mmu.c:1491-1500`）分配 `pkmap_page_table`（`CONFIG_HIGHMEM`）与 fixmap 的 PTE 表；`top_pmd = pmd_off_k(0xffff0000)`（`:1807`）记下向量表 PMD 供后续 kuser helper 使用；`early_alloc(PAGE_SIZE)`（`:1810`）拿到 **zero page**——它是 `pte_mkdirty`/缺页填零的实体，也是本树里第一块"分配自空闲池"的页；`bootmem_init()`（`init.c:209`）走 `memblock_allow_resize`→`find_limits`→`early_memtest`→`zone_sizes_init`（`init.c:113-126`）→`free_area_init()`（`init.c:125`）按 `ZONE_DMA`/`ZONE_NORMAL`/`ZONE_HIGHMEM` 建好 mem_map。
+`kmap_init()`（`mmu.c:1459-1468`）分配 `pkmap_page_table`（`CONFIG_HIGHMEM`）与 fixmap 的 PTE 表；`top_pmd = pmd_off_k(0xffff0000)`（`:1773`）记下向量表 PMD 供后续 kuser helper 使用；`early_alloc(PAGE_SIZE)` 拿到 **zero page**（7.3.0 中此步已不在 `paging_init`，改由 `mm_core_init()` 的 `init_zero_page_pfn()` 完成，见 `mm/mm_init.c:2646`）——它是 `pte_mkdirty`/缺页填零的实体，也是本树里第一块"分配自空闲池"的页；`bootmem_init()`（`init.c:202`）在 7.3.0 里只做 `memblock_allow_resize`→`find_limits`→`early_memtest`；建 mem_map 已不在此——改由 `mm_core_init_early()`（`mm/mm_init.c:2627`）调 `free_area_init()`（定义在 `mm/mm_init.c:1761`，于 `:2631` 调用），后者在 `mm/mm_init.c:1768` 调 `arch_zone_limits_init()`（实现见 `arch/arm/mm/init.c:110`）按 `ZONE_DMA`/`ZONE_NORMAL`/`ZONE_HIGHMEM` 建好 mem_map。
 
 ### 6.3 `request_standard_resources()` — `arch/arm/kernel/setup.c:886`
 
@@ -398,9 +399,9 @@ flowchart TD
 `unflatten_device_tree()`（`setup.c:1197`）把扁平 DTB 字节流解成 `struct device_node` 树。
 
 > [!NOTE] 顺序要求的真实前提：永久映射 + 可用分配器
-> 常见的粗浅说法是"因为解包需要动态内存"——但此时 **slab/kmalloc 仍不可用**（`kmem_cache_init()` 在 `mm/mm_init.c:2708`），与"无动态内存"的说法自相矛盾。真正的约束有两条：
-> 1. **分配器**：`unflatten` 用的是 memblock/`early_alloc`，而 memblock 直到 `mmu.c:1794` 设完 current limit 才真正可用（源码注释 `mmu.c:1796-1799` 原话：*"After this point early_alloc(), i.e. the memblock allocator, can be used"*）；
-> 2. **映射**：`paging_init` 之前 DTB 只能经 `FDT_VIRT_BASE()` 或 fixmap 的 `FDT_FIXED_BASE`（`mmu.c:1410-1417`）临时访问，而解出来的指针树要**终身可见**。
+> 常见的粗浅说法是"因为解包需要动态内存"——但此时 **slab/kmalloc 仍不可用**（`kmem_cache_init()` 在 `mm/mm_init.c:2672`），与"无动态内存"的说法自相矛盾。真正的约束有两条：
+> 1. **分配器**：`unflatten` 用的是 memblock/`early_alloc`，而 memblock 直到 `mmu.c:1760` 设完 current limit 才真正可用（源码注释 `mmu.c:1763-1766` 原话：*"After this point early_alloc(), i.e. the memblock allocator, can be used"*）；
+> 2. **映射**：`paging_init` 之前 DTB 只能经 `FDT_VIRT_BASE()` 或 fixmap 的 `FDT_FIXED_BASE`（`mmu.c:1378-1385`）临时访问，而解出来的指针树要**终身可见**。
 >
 > 所以顺序要求来自"永久映射 + 可用分配器"，与 slab 无关。
 
@@ -497,36 +498,36 @@ flowchart TD
 `setup_arch()` 的**最后一步**，把控制权交给 SoC 原厂做芯片级极早期修正。字段声明 `arch.h:54`。
 
 > [!INFO] 现代平台的实际情况
-> 该钩子主要被老平台使用；很多新 SoC 的 `DT_MACHINE_START` 只填 `map_io`/`init_irq`/`init_machine`/`init_late`/`dt_compat`，`init_early` 为空——此时这两行就是**纯空操作**，芯片早期工作被下推到 `.map_io`（`mmu.c:1469-1470`）与 `IRQCHIP_DECLARE`/`OF_EARLYCON_DECLARE` 的自动声明机制里。不必一看到"移交厂商钩子"就以为一定有事发生。
+> 该钩子主要被老平台使用；很多新 SoC 的 `DT_MACHINE_START` 只填 `map_io`/`init_irq`/`init_machine`/`init_late`/`dt_compat`，`init_early` 为空——此时这两行就是**纯空操作**，芯片早期工作被下推到 `.map_io`（`mmu.c:1437-1438`）与 `IRQCHIP_DECLARE`/`OF_EARLYCON_DECLARE` 的自动声明机制里。不必一看到"移交厂商钩子"就以为一定有事发生。
 
 ---
 
 ## 🔀 10. 权责边界：`setup_arch` → `mm_core_init` → initcall
 
-> [!NOTE] 关于函数名：本树（6.18）里没有 `mm_init()`
-> 历史上 `setup_arch()` 之后接的是 `mm_init()`，但那是**旧版命名**。在 6.18 本仓库中该函数已更名 `mm_core_init()`：`grep mm_init init/main.c` 已零命中，正确名见 `init/main.c:971` → 实现 `mm/mm_init.c:2679`。阅读旧资料、对照老内核时，头脑里应把这张表映射到当前命名，避免按名索骥扑空。
+> [!NOTE] 关于函数名：本树（7.3）里没有 `mm_init()`
+> 历史上 `setup_arch()` 之后接的是 `mm_init()`，但那是**旧版命名**。在 7.3 本仓库中该函数已更名 `mm_core_init()`：`grep mm_init init/main.c` 已零命中，正确名见 `init/main.c:1232` → 实现 `mm/mm_init.c:2643`。阅读旧资料、对照老内核时，头脑里应把这张表映射到当前命名，避免按名索骥扑空。
 
 | 阶段 | 核心主体 | 调用点 | 内存环境 | 本质工作 | 产物 |
 | --- | --- | --- | --- | --- | --- |
-| **拓荒打地基** | **`setup_arch()`** | `init/main.c:932` | 仅 memblock，且前半程连 memblock 都不能分配 | 测物理边界、原地扩建直映射、硬件验身、DT 解包、多核拓扑 | `arm_lowmem_limit`、`high_memory`、`swapper_pg_dir`（扩建完成）、`of_root` 节点树、`iomem_resource`、`mpidr_hash`、`mem_map` |
-| **建制通水电** | **`mm_core_init()`** | `init/main.c:971`<br/>`mm/mm_init.c:2679` | memblock 交权给伙伴系统 | `arch_mm_preinit`→`build_all_zonelists`→`memblock_free_all`→`mem_init`→`kmem_cache_init`→`vmalloc_init` | 伙伴系统链表、`kmalloc()`/`kfree()` 生效、slab、vmalloc 树 |
+| **拓荒打地基** | **`setup_arch()`** | `init/main.c:1175` | 仅 memblock，且前半程连 memblock 都不能分配 | 测物理边界、原地扩建直映射、硬件验身、DT 解包、多核拓扑 | `arm_lowmem_limit`、`high_memory`、`swapper_pg_dir`（扩建完成）、`of_root` 节点树、`iomem_resource`、`mpidr_hash`、`mem_map` |
+| **建制通水电** | **`mm_core_init()`** | `init/main.c:1232`<br/>`mm/mm_init.c:2643` | memblock 交权给伙伴系统 | `arch_mm_preinit`→`build_all_zonelists`→`memblock_free_all`→`mem_init`→`kmem_cache_init`→`vmalloc_init` | 伙伴系统链表、`kmalloc()`/`kfree()` 生效、slab、vmalloc 树 |
 | **精装搬家具** | **initcall + `mdesc->init_machine()`** | `setup.c:975-976` | 完整动态内存与并发 | DT 节点实例化为 platform_device，驱动 probe | 驱动生效、设备节点、`rest_init()`→PID 1 |
 
-`mm_core_init()` 内部与内存交接直接相关的顺序（`mm/mm_init.c:2679-2729`）：
+`mm_core_init()` 内部与内存交接直接相关的顺序（`mm/mm_init.c:2643-2693`）：
 
 | 行号 | 调用 | 意义 |
 | --- | --- | --- |
-| `:2681` | `arch_mm_preinit()` | 架构侧钩子（`arch/arm/mm/init.c:243`） |
-| `:2686` | `build_all_zonelists()` | 分配域回退顺序 |
-| `:2704` | `kho_memory_init()` | 注释要求"memblock 仍活跃但尽量贴近伙伴系统初始化" |
-| `:2706` | **`memblock_free_all()`** | **memblock 把未保留页交还伙伴系统** |
-| `:2707` | `mem_init()` | `printk` 内存统计，伙伴系统正式接管 |
-| `:2708` | `kmem_cache_init()` | **`kmalloc` 从此可用** |
-| `:2716` | `pgtable_cache_init()` | 页表缓存 |
-| `:2718` | `vmalloc_init()` | vmalloc 树；内核只读化/W^X 收紧在此后完成 |
+| `:2645` | `arch_mm_preinit()` | 架构侧钩子（`arch/arm/mm/init.c:223`） |
+| `:2650` | `build_all_zonelists()` | 分配域回退顺序 |
+| `:2668` | `kho_memory_init()` | 注释要求"memblock 仍活跃但尽量贴近伙伴系统初始化" |
+| `:2670` | **`memblock_free_all()`** | **memblock 把未保留页交还伙伴系统** |
+| `:2671` | `mem_init()` | `printk` 内存统计，伙伴系统正式接管 |
+| `:2672` | `kmem_cache_init()` | **`kmalloc` 从此可用** |
+| `:2680` | `pgtable_cache_init()` | 页表缓存 |
+| `:2682` | `vmalloc_init()` | vmalloc 树；内核只读化/W^X 收紧在此后完成 |
 
 > [!SUCCESS] 边界结论
-> `setup_arch()` 与 `mm_core_init()` 的分界线，就是 **`memblock_free_all()`（`mm_init.c:2706`）**。在此之前的每一次"分配"都是 memblock 的 `early_alloc`，且**永不返回**（页表一旦分配就用到系统关机）；在此之后才出现真正意义上的可回收内存。
+> `setup_arch()` 与 `mm_core_init()` 的分界线，就是 **`memblock_free_all()`（`mm_init.c:2670`）**。在此之前的每一次"分配"都是 memblock 的 `early_alloc`，且**永不返回**（页表一旦分配就用到系统关机）；在此之后才出现真正意义上的可回收内存。
 
 ---
 
@@ -536,10 +537,10 @@ flowchart TD
 
 | 常见口径 | 本树实际 | 证据 |
 | --- | --- | --- |
-| "`paging_init` 切换到主内核页表" | 全程复用 `head.S` 已加载的 `swapper_pg_dir`，原地扩建 | `head.S:48,167`；`mmu.c:1780` 无 `cpu_switch_mm` |
-| "Lowmem ≈ 784MB" | 768MB（1016 − 240 − 8），且还会被 PMD 对齐再压低 | `mmu.c:1223`、`pgtable.h:49,51`、`mmu.c:1178` |
+| "`paging_init` 切换到主内核页表" | 全程复用 `head.S` 已加载的 `swapper_pg_dir`，原地扩建 | `head.S:48,167`；`mmu.c:1748` 无 `cpu_switch_mm` |
+| "Lowmem ≈ 784MB" | 768MB（1016 − 240 − 8），且还会被 PMD 对齐再压低 | `mmu.c:1191`、`pgtable.h:49,51`、`mmu.c:1146` |
 | "`hyp_mode_check()` 检查各核特权模式" | 只在 `!is_smp()` 时执行 | `setup.c:1214-1215` |
-| "unflatten 需要动态内存（slab）" | slab 未建立；真实约束是 memblock 可用 + 永久映射 | `mmu.c:1796-1799`、`mm_init.c:2708` |
+| "unflatten 需要动态内存（slab）" | slab 未建立；真实约束是 memblock 可用 + 永久映射 | `mmu.c:1763-1766`、`mm_init.c:2672` |
 | "crashkernel 按 128MB 对齐" | 仅自动选址分支；显式地址用 `SECTION_SIZE` | `setup.c:1049` vs `:1059` |
 | "无条件注册重启回调" | `if (mdesc->restart)` 才注册 | `setup.c:1192-1195` |
 
@@ -548,16 +549,16 @@ flowchart TD
 ## 🔭 12. 可观测抓手
 
 1. **串口日志顺序**即执行顺序：`Linux version` → `CPU: ARMv7 ...`（`setup.c:750`）→ `Machine: ...` → `Memory:`/`memblock_dump_all()`（`init.c:206`）→ `CPU: All CPU(s) started in SVC mode.`（`setup.c:1109`）→ `Reserving N MB of memory at M MB for crashkernel`（`setup.c:1067`）。
-2. **`earlycon` 是 `devicemaps_init()` 期间唯一安全的调试手段**（`mmu.c:1384-1390` 明文规定）。
+2. **`earlycon` 是 `devicemaps_init()` 期间唯一安全的调试手段**（`mmu.c:1352-1357` 明文规定）。
 3. `memblock_dump_all()`（`init.c:206`）打印全部 memory/reserved region，是理解 `arm_memblock_init()` 效果最直接的手段。
 4. `/proc/iomem` 来自 `request_standard_resources()`（`setup.c:886`）与 crashkernel 的 `insert_resource`（`:1075`）。
 5. `mpidr_hash` 参数可通过 `pr_debug`（`setup.c:665`、`:697-702`）打开查看压缩结果。
-6. `arm_lowmem_limit` 用 `pr_debug("lowmem limit is %08llx")`（`mmu.c:1795`）确认。
+6. `arm_lowmem_limit` 用 `pr_debug("lowmem limit is %08llx")`（`mmu.c:1761`）确认。
 
 ### 附：本笔记事实核查范围
 
 - 核实对象：`arch/arm/kernel/setup.c`、`arch/arm/mm/{mmu,init,ioremap}.c`、`arch/arm/kernel/{devtree,atags_parse}.c`、`arch/arm/include/asm/{mach/arch.h,pgtable.h}`、`arch/arm/kernel/{head.S,vmlinux.lds.S}`、`init/main.c`、`mm/mm_init.c`、`arch/arm/Kconfig`。
-- 内核版本：Makefile VER 6.18.20（NXP `lf-6.18.y`）。
+- 内核版本：Makefile VER 7.3.0-rc6（mainline，树 HEAD `7b63ef2d5`，2026-10-07）。
 - **本文刻意不做 imx6ull 板级特化**，`arch/arm/mach-imx/` 细节仅在说明 `DT_MACHINE_START` 仍存活时顺带提及。
 
 ---
@@ -568,12 +569,12 @@ flowchart TD
 > - [ ] **执行序**：能按 `setup.c:1127-1227` 的 31 步逐行说出每步作用，含 10 处"常见文档漏掉的"步骤（init_mm 填边界、`setup_initial_init_mm`、`early_mm_init`、`setup_dma_zone` 等）
 > - [ ] **768MB 生死线**：懂得用 `VMALLOC_END − PAGE_OFFSET − vmalloc(240MB) − VMALLOC_OFFSET(8MB)` 复算 lowmem 上限，能说清默认布局 = 768MB 且随 VMSPLIT / `vmalloc=` 移动
 > - [ ] **原生页表与切分**：讲清 `head.S` 把 `swapper_pg_dir` 装进 TTBR1 后 `paging_init` 全程同一张表原地扩建，无"页表切换"；指出 LPAE 高物理地址才是例外
-> - [ ] **memblock 可用性时刻**：确认 `memblock_set_current_limit()`（`mmu.c:1794`）之前不能碰 memblock、早期 fixmap 只靠 `bm_pte` 静态页
+> - [ ] **memblock 可用性时刻**：确认 `memblock_set_current_limit()`（`mmu.c:1760`）之前不能碰 memblock、早期 fixmap 只靠 `bm_pte` 静态页
 > - [ ] **向量表与异步 abort**：`devicemaps_init()` 先建 `0xffff0000` 向量表再 `early_abt_enable()`，期间调试只能用 `earlycon`
 > - [ ] **设备树与重启**：`unflatten_device_tree()` 依赖 memblock 可用 + 永久映射（非 slab）；重启回调受 `if (mdesc->restart)` 约束
 > - [ ] **多核钩子条件**：`smp_build_mpidr_hash()` 仅 SMP + `is_smp()`；`hyp_mode_check()` 仅 `!is_smp()`
 > - [ ] **crashkernel 对齐**：自动选址用 `CRASH_ALIGN`(128MB)、显式 `X@Y` 用 `SECTION_SIZE`，上界限制在低段恒等映射 + lowmem 内
-> - [ ] **命名更新**：能确认 6.18 下 `mm_init()` 已更名 `mm_core_init()`（`init/main.c:971` / `mm/mm_init.c:2679`），分界在 `memblock_free_all()`
+> - [ ] **命名更新**：能确认 7.3 下 `mm_init()` 已更名 `mm_core_init()`（`init/main.c:1232` / `mm/mm_init.c:2643`），分界在 `memblock_free_all()`
 > - [ ] **可观测**：能从串口日志顺序、`memblock_dump_all()`、`/proc/iomem`、`pr_debug`（mpidr_hash / lowmem limit）反推执行是否正常
 
 ---
@@ -591,7 +592,7 @@ flowchart TD
 
 ## 📚 参考资料
 
-1. **Linux Kernel 源码（本仓库 6.18.20 / NXP lf-6.18.y）** — `arch/arm/kernel/setup.c`（31 步执行序与全部阶段钩子）.
+1. **Linux Kernel 源码（本仓库 7.3.0-rc6 / mainline）** — `arch/arm/kernel/setup.c`（31 步执行序与全部阶段钩子）.
 2. **Linux Kernel 源码（本仓库）** — `arch/arm/mm/mmu.c`（`paging_init`、`adjust_lowmem_bounds`、`devicemaps_init`、`early_paging_init` 指针）.
 3. **Linux Kernel 源码（本仓库）** — `init/main.c` 与 `mm/mm_init.c`（`setup_arch` 调用点、`mm_core_init` 更名与内存交接顺序）.
 4. **Linux Kernel 源码（本仓库）** — `arch/arm/kernel/head.S`（`swapper_pg_dir` 定义、`__create_page_tables`、TTBR1 装载）。

@@ -11,6 +11,7 @@ tags:
   - imx6ull
 status: Completed
 created: 2026-09-30
+kernel: "7.3.0-rc6 (mainline)"
 ---
 
 # 🗺️ kernel mm视图：32 位内核 1GB 虚拟地址全景与启动六阶段

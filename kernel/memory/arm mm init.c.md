@@ -11,6 +11,7 @@ tags:
   - RWX
 status: In-progress
 created: 2026-09-30
+kernel: "7.3.0-rc6 (mainline)"
 ---
 
 # 🧠 ARM mm/init.c 内存初始化完整技术手册
@@ -801,7 +802,7 @@ execmem_arch_setup()
 .pgprot = PAGE_KERNEL_EXEC
 ```
 
-这两个宏定义在 `arch/arm/include/asm/memory.h:60`：
+这两个宏定义在 `arch/arm/include/asm/memory.h:60/74`：
 
 ```c
 #define MODULES_VADDR  (PAGE_OFFSET - SZ_16M)     // Thumb2 为 PAGE_OFFSET - SZ_8M
@@ -829,7 +830,7 @@ TASK_SIZE (0xBFFFFFFF)
 
 ### 9.3 `CONFIG_ARM_MODULE_PLTS`：回退到 vmalloc
 
-`fallback` 到 vmalloc 区，是 **`CONFIG_ARM_MODULE_PLTS` 打开后**才发生的事（`init.c:475-478`）：
+`fallback` 到 vmalloc 区，是 **`CONFIG_ARM_MODULE_PLTS` 打开后**才发生的事（`init.c:456-457`）：
 
 ```c
 fallback_start = VMALLOC_START;
@@ -871,32 +872,32 @@ fallback：  VMALLOC_START ~ VMALLOC_END   ← 仅 CONFIG_ARM_MODULE_PLTS 时，
 ```text
 start_kernel
  ├─ setup_arch [arch/arm/kernel/setup.c]
- │    ├─ early_mm_init / adjust_lowmem_bounds ×2 / arm_memblock_init   init.c:187
- │    ├─ paging_init ──► bootmem_init   init.c:209   ←★ bootmem_init 唯一调用点 mmu.c:1812
+ │    ├─ early_mm_init / adjust_lowmem_bounds ×2 / arm_memblock_init   init.c:180
+ │    ├─ paging_init ──► bootmem_init   init.c:202   ←★ bootmem_init 唯一调用点 mmu.c:1775
  │    │                        ├─ find_limits → min_low_pfn / max_low_pfn / max_pfn
  │    │                        ├─ early_memtest  (memtest= 参数控制，默认关)
  │    │                        ├─ sparse_init    → struct page 数组
  │    │                        └─ zone_sizes_init → free_area_init（只 ZONE_NORMAL…）
  │    └─ ...
  │
- ├─ mm_core_init [mm/mm_init.c:2679]
- │    ├─ arch_mm_preinit()    init.c:243   ← SA1111 释放 / VA 边界断言（仅 LPAE 才动 swiotlb）
+ ├─ mm_core_init [mm/mm_init.c:2643]
+ │    ├─ arch_mm_preinit()    init.c:223   ← SA1111 释放 / VA 边界断言（仅 LPAE 才动 swiotlb）
  │    ├─ build_all_zonelists
  │    ├─ memblock_free_all()               ←★ Buddy 此刻才真正收到空闲页
  │    ├─ mem_init / kmem_cache_init / vmalloc_init
- │    └─ execmem_init() → execmem_arch_setup()   init.c:471
+ │    └─ execmem_init() → execmem_arch_setup()   init.c:451
  │
- └─ kernel_init [init/main.c:1474]   ← 进入用户态之前
-      ├─ free_initmem()        init.c:433
+ └─ kernel_init [init/main.c:1867]   ← 进入用户态之前
+      ├─ free_initmem()        init.c:413
       │    ├─ fix_kernmem_perms() → stop_machine → nx_perms → PMD 打 XN
       │    ├─ poison_init_mem(0xe7fddef0)
       │    └─ free_initmem_default(-1)   → 归还 Buddy
-      └─ mark_readonly() [main.c:1447]
-           └─ mark_rodata_ro() init.c:423 → stop_machine → ro_perms → PMD 打 RO
+      └─ mark_readonly() [main.c:1827]
+           └─ mark_rodata_ro() init.c:403 → stop_machine → ro_perms → PMD 打 RO
 ```
 
 > [!IMPORTANT] 两个关键顺序
-> - `free_initmem()` **先**、`mark_rodata_ro()` **后**（`main.c:1492/1493`），两者同处 `kernel_init()`。
+> - `free_initmem()` **先**、`mark_rodata_ro()` **后**（`main.c:1892/1893`），两者同处 `kernel_init()`。
 > - **Buddy 在 `mm_core_init` 里的 `memblock_free_all()` 就已正式开工**；RWX 收紧（`fix_kernmem_perms / mark_rodata_ro`）发生在内核已跑起来、initcall 都执行完之后的 `kernel_init()` 阶段。不要把 RWX 收紧画在 Buddy 之前。
 
 ---
@@ -1007,7 +1008,7 @@ init.c
 ## 📚 参考资料
 
 1. **Linux Kernel 源码** — `arch/arm/mm/init.c`（memblock/bootmem/zone/RWX/init 回收主流程）.
-2. **Linux Kernel 源码** — `arch/arm/include/asm/memory.h:60`（`MODULES_VADDR`/`MODULES_END`）与 `asm/highmem.h:8`（`PKMAP_BASE`）.
-3. **Linux Kernel 源码** — `mm/mm_init.c:2679`（`mm_core_init`）、`init/main.c:1474`（`kernel_init`）.
+2. **Linux Kernel 源码** — `arch/arm/include/asm/memory.h:60/74`（`MODULES_VADDR`/`MODULES_END`）与 `asm/highmem.h:8`（`PKMAP_BASE`）.
+3. **Linux Kernel 源码** — `mm/mm_init.c:2643`（`mm_core_init`）、`init/main.c:1867`（`kernel_init`）.
 4. **Linux Kernel 文档** — *Documentation/admin-guide/mm/* 与 kernel memory management（buddy、sparse、zone）.
 5. **ARM Architecture Reference Manual** — CP15 Cache Type Register、`CR_XP`、I-Cache line size 语义.

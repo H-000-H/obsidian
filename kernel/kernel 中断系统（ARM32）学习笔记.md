@@ -11,6 +11,7 @@ tags:
   - ipi
 status: Completed
 created: 2026-09-30
+kernel: "7.3.0-rc6 (mainline)"
 ---
 
 # ⚡ 中断系统学习笔记（ARM32）

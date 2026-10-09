@@ -8,6 +8,7 @@ tags:
   - Page-Table
 status: In-progress
 created: 2026-09-30
+kernel: "7.3.0-rc6 (mainline)"
 ---
 
 # 🧮 页表预分配 mmu.c 缓存策略速查
@@ -59,7 +60,7 @@ created: 2026-09-30
 ## 🔗 思考与延伸索引
 
 - [[mmu.c kernel起步]] — `map_lowmem`/`map_kernel` 映射时如何落地这些缓存属性
-- [[arm mm init.c]] — `build_mem_type_table`（mmu.c:463）按 CPU/命令行为 `mem_type` 修正 `.prot_pte/.prot_pmd`，缓存策略在此编码为硬件位
+- [[arm mm init.c]] — `build_mem_type_table`（mmu.c:435）按 CPU/命令行为 `mem_type` 修正 `.prot_pte/.prot_pmd`，缓存策略在此编码为硬件位
 - [[ARM Cache 一致性]] — DMA 与 CPU 视角下 `writeback`/`writealloc` 的 flush/clean 责任边界
 - [[Linux 内存管理]] — cache 策略与页表属性（`W/WT/PAT` 等）映射到通用 MM
 

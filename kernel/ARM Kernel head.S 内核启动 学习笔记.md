@@ -10,6 +10,7 @@ tags:
   - SMP
 status: Completed
 created: 2026-09-30
+kernel: "7.3.0-rc6 (mainline)"
 ---
 
 # 🏗️ ARM Kernel head.S 内核启动 学习笔记
@@ -53,7 +54,7 @@ ARM 架构硬件规范中，**D-Cache 必须依赖 MMU 提供的内存属性（�
 > [!NOTE] D-Cache 与 MMU 的硬依赖
 > 「Cache 由 MMU 的属性位驱动」是 ARM 的硬件约束，不是软件实现细节——这正是自解压阶段即使只是加速也**必须先建表**的根因。细节见《ARM zImage head.S 启动 学习笔记》§8.6「为什么非得有表才能开 cache」。
 
-### 2.2 `__setup_mmu`：16KB 表平铺 4GB（head.S:794-833）
+### 2.2 `__setup_mmu`：16KB 表平铺 4GB（head.S:793-832）
 
 位于 `arch/arm/boot/compressed/head.S`。页表就放在内核载入地址正下方 16KB 处：
 
@@ -89,7 +90,7 @@ __setup_mmu:
 - **关键细节**：4GB 平铺是对的，但**只有 RAM 窗口 `[ram_start & ~1MB, +256MB)` 内的段才会置 Cacheable/Bufferable 位**；窗口外的非 RAM 段被强制 XN（不可执行）。注释明示这段映射会被之后的 `paging_init()` 移除。
 - 紧随其后还有一段：把 PC 所在的 2MB 也按 cacheable 映射，专为"内核跑在 Flash 上"的场景准备（在 RAM 里跑则只是重复覆盖）。
 
-### 2.3 会覆盖自身时跳过建表的前提（head.S:318-330）
+### 2.3 会覆盖自身时跳过建表的前提（head.S:317-329）
 
 ```cpp
 /*
@@ -101,7 +102,7 @@ orrcc   r4, r4, #1              @ remember we skip
 blcs    cache_on
 ```
 
-页表**不一定总能建立**：若 `r4 - 16K` 这块页表区会踩到正在执行的 zImage 本体，就放弃建表、放弃 `cache_on`，改用 `r4` 的最低位记录这件事；等 Image 复制完成（`relocate_kernel` 之后）再补做 `cache_on`（head.S:617-622）。所以"自解压必然带 Cache"不是恒成立的；页表可能根本不建，解压退回无 Cache 模式。
+页表**不一定总能建立**：若 `r4 - 16K` 这块页表区会踩到正在执行的 zImage 本体，就放弃建表、放弃 `cache_on`，改用 `r4` 的最低位记录这件事；等 Image 复制完成（`relocate_kernel` 之后）再补做 `cache_on`（head.S:619-621）。所以"自解压必然带 Cache"不是恒成立的；页表可能根本不建，解压退回无 Cache 模式。
 
 > [!WARNING] 先判表会不会压到自身，再决定是否开缓存
 > 建表前务必核对 `r4 - 16K` 页表区是否会覆盖正在执行的镜像本体：会则**跳过建表与 cache_on**，并用 `r4` 最低位做记号，待 relocate 之后补做。这是自解压能安全兜底无 Cache 模式的前提——若忽略该判定强行建表，会直接砸中自身指令流。
@@ -178,7 +179,7 @@ THUMB(  strh    r6, [r0]                )
 - 链接脚本通过 `include/asm/alternative.h` 的 `ALT_SMP / ALT_UP` 宏生成补丁条目，落在 `.alt.smp.init` 段，由 `arch/arm/kernel/vmlinux.lds.S` 收拢为 `__smpalt_begin / __smpalt_end`。
 - 每条补丁 8 字节结构：`[Offset, Replacement Opcode]`。汇编引擎逐条遍历，直接用 `str` / `strh` 将代码段中的多核总线屏障指令（如昂贵的跨核 `dmb ish`）就地改写为单核轻量指令或 `nop`。
 - 一致性由调用方的常规 `flush_icache_range()` 负责，因此补丁过程本身无需再刷 I-Cache 或 `isb`。
-- 顺带：`smp_on_up` 变量（head.S:571-577）用 `ALT_SMP(.long 1) / ALT_UP(.long 0)` 被同一机制改成 0，供 C 代码运行期查询。
+- 顺带：`smp_on_up` 变量（head.S:570-574）用 `ALT_SMP(.long 1) / ALT_UP(.long 0)` 被同一机制改成 0，供 C 代码运行期查询。
 
 ### 3.3 `__fixup_pv_table`（`CONFIG_ARM_PATCH_PHYS_VIRT`）
 
@@ -186,7 +187,7 @@ THUMB(  strh    r6, [r0]                )
 
 ---
 
-## 🗺️ 4. 阶段三：`__create_page_tables` —— 现场手搭早期页表（head.S:187-379）
+## 🗺️ 4. 阶段三：`__create_page_tables` —— 现场手搭早期页表（head.S:187-377）
 
 ```asm
 __create_page_tables:
@@ -211,7 +212,7 @@ __create_page_tables:
 
 ---
 
-## 🔌 5. 阶段四：跨越 MMU 虫洞 —— `__enable_mmu` 与 `__turn_mmu_on`（head.S:470-522）
+## 🔌 5. 阶段四：跨越 MMU 虫洞 —— `__enable_mmu` 与 `__turn_mmu_on`（head.S:467-519）
 
 ```asm
 __enable_mmu:
@@ -253,7 +254,7 @@ mcr     p15, 0, \ttbr1, c2, c0, 1         @ load TTB1（装载了但此刻用不
 
 1. **合闸瞬间的 1:1 浮桥掩护**：写完 `mcr` 使能 MMU 后的那一纳秒，CPU 取指流水线仍在低地址抓取接下来的 `mrc`、`mov` 指令。此时 MMU 已生效，但低地址被第 4 步的 1:1 段兜住，虚拟查询返回等值物理地址，翻译结果等于物理地址，流水线平滑无感执行，绝不触发 Prefetch Abort。这正是 `__turn_mmu_on` 被单独塞进 `.idmap.text` 并 `.align 5`（32 字节对齐、不跨段）的原因。
 2. **`ret r3` 绝对跳转**：`r13` 此时并不作为栈，而是携带编译期由 `vmlinux.lds` 固化的虚拟高位入口符号。`ret r3`（`bx r3`）把 `0xC000xxxx` 拍进 PC，同步冲刷作废 CPU 流水线中预取的所有物理指令；重新拉取的指令全面命中高位线性映射段，CPU 彻底跃迁进入虚拟大陆。
-3. **`r13` 的两种人格**：`__secondary_switched` 处 `mov r13, r12` 同理（head.S:427），所以汇编期 `sp` 全程只是临时寄存器。
+3. **`r13` 的两种人格**：`__secondary_switched` 处 `mov r13, r12` 同理（head.S:426），所以汇编期 `sp` 全程只是临时寄存器。
 
 > [!WARNING] 合闸瞬间不能脱离 1:1 浮桥
 > 使能 MMU 与真正 `ret r3` 之间，PC 仍在物理低地址执行——这段**必须**落在 1:1 恒等段覆盖的 `__turn_mmu_on .._end` 之内。若该段被删或跨了对齐边界，合闸那一瞬流水线取指即 Prefetch Abort。这解释了为什么把它钉在 `.idmap.text` 且 `.align 5`（不跨段）。
@@ -264,7 +265,7 @@ mcr     p15, 0, \ttbr1, c2, c0, 1         @ load TTB1（装载了但此刻用不
 
 ### 6.1 主核：`__mmap_switched`
 
-`__mmap_switched` 在 `arch/arm/kernel/head-common.S`（head.S:605 处 `#include` 进来），不在 head.S 正文：
+`__mmap_switched` 在 `arch/arm/kernel/head-common.S`（head.S:602 处 `#include` 进来），不在 head.S 正文：
 
 ```asm
 __mmap_switched:                    @ __INIT 段，非 PIC
@@ -291,7 +292,7 @@ ARM(    lmia    r4!, {r0, r1, sp}   )   @ r0=__bss_start, r1=__bss_stop, sp=正�
 **「第一块栈 = idle 任务」的证据链：**
 
 ```c
-/* include/asm-generic/vmlinux.lds.h:410-415 */
+/* include/asm-generic/vmlinux.lds.h:425-432 */
 __start_init_stack = .;
 init_thread_union = .;        /* 同一个 8KB 块的前 THREAD_SIZE 是栈、末尾是 thread_info */
 init_stack = .;
@@ -300,14 +301,14 @@ __end_init_stack = .;
 ```
 
 ```c
-/* arch/arm/include/asm/thread_info.h:21-26 */
+/* arch/arm/include/asm/thread_info.h:21-31 */
 THREAD_SIZE_ORDER = 2 (KASAN) / 1 (默认)   /* 本机非 KASAN：THREAD_SIZE = 4K<<1 = 8KB */
 THREAD_START_SP = THREAD_SIZE - 8          /* 栈顶（满递减，留 8 字节） */
 THREAD_ALIGN = 2*THREAD_SIZE (VMAP_STACK)  /* 本机 VMAP_STACK=y，按 16K 对齐以隔出 guard page */
 ```
 
 ```c
-/* init/init_task.c:75 */
+/* init/init_task.c:111 */
 .stack = init_stack            /* init_task 的 task_struct->stack 正是这块 */
 ```
 
@@ -325,9 +326,9 @@ secondary_data.task = idle;
 sync_cache_w(&secondary_data);                                    /* 从核此时 D-cache 可能关着，须脏线冲刷 */
 ```
 
-从核入口 `secondary_startup`（head.S:389-432）用 `ldrd r4, r5, [r3]` 取 `idmap_pgd`（`mov_l r12, __secondary_switched` 走 GOT 取绝对址，因为从核在别的物理位置执行）。注意它装载的是 `idmap_pgd` 而非主核那张早期表 —— `init_static_idmap()`（mm/idmap.c:112-125）在 `early_initcall` 里用 `pgd_alloc()` 建好的静态 1:1 表，覆盖 `__idmap_text_start..__idmap_text_end`。
+从核入口 `secondary_startup`（head.S:388-431）用 `ldrd r4, r5, [r3]` 取 `idmap_pgd`（`mov_l r12, __secondary_switched` 走 GOT 取绝对址，因为从核在别的物理位置执行）。注意它装载的是 `idmap_pgd` 而非主核那张早期表 —— `init_static_idmap()`（arch/arm/mm/idmap.c:113-127）在 `early_initcall` 里用 `pgd_alloc()` 建好的静态 1:1 表，覆盖 `__idmap_text_start..__idmap_text_end`。
 
-着陆点（head.S:435-448）：
+着陆点（head.S:434-447）：
 
 ```asm
 ENTRY(__secondary_switched)
@@ -373,7 +374,7 @@ bootmem_init();
 __flush_dcache_folio(NULL, page_folio(empty_zero_page));
 ```
 
-### 7.1 拆桥 = `prepare_page_table()`（mmu.c:1289）
+### 7.1 拆桥 = `prepare_page_table()`（mmu.c:1273）
 
 ```c
 for (addr = 0; addr < MODULES_VADDR; addr += PMD_SIZE)   /* KASAN 时拆成两段跳过 shadow 区 */
@@ -390,11 +391,11 @@ for ( ; addr < PAGE_OFFSET; addr += PMD_SIZE)
 > [!WARNING] 拆桥前必须已脱离低地址
 > 「拆桥」只在对**高地址虚址**安全之后才合法：清除的是低位段映射（1:1 桥与用户区），而 `PC/SP/数据` 必须全部已迁至高位的 0xC0000000+ 空间。若拆桥时仍有任何执行流依赖低物理地址映射（如自解压壳刚进 `stext` 的瞬间），`pmd_clear` 会造成 Prefetch/Data Abort——这正是 §5 的 1:1 桥到 §7.1 才能拆的时间窗口。
 
-### 7.2 精细程度的实话（mmu.c:936-1001、1569-1599）
+### 7.2 精细程度的实话（mmu.c:920-986、1537-1567）
 
 - `create_mapping()` 的注释写着 *"we take full advantage of sections and supersections"*：**不是清一色 4KB PTE**。`mem_types[].prot_l1 = PMD_TYPE_TABLE` 时经 `alloc_init_p4d → … → create_pte_mapping` 才落 4KB 表；能按 1MB 对齐的仍用 section；物理地址 ≥4GB 走 supersection（16MB）；LPAE 走另一套。
 - `map_kernel()` 只做 section 级 RWX 切分，分界是 `round_up(__pa(__init_end), SECTION_SIZE)`：之前 `X`，之后 `NX`。它自己的注释承认：*"Notice that we are dealing with section sized mappings here … some of the non-executable part of the kernel memory is actually mapped as executable. This will only persist until … we remap the whole kernel with page granularity."*
-- 真正页粒度的权限收紧发生在更晚的 `create_mapping_late()`（mmu.c:1004，目前主要被 `kernel/efi.c` 用于 EFI 区域）与 module / `set_memory_*` 路径。
+- 真正页粒度的权限收紧发生在更晚的 `create_mapping_late()`（mmu.c:988，目前主要被 `kernel/efi.c` 用于 EFI 区域）与 module / `set_memory_*` 路径。
 - 所以 `.text RO+X / .rodata RO+NX / .data+栈 RW+NX` 作为**最终形态**描述可以，但 **`paging_init()` 当场**给出的是 section 粒度的近似。
 
 > [!NOTE] 「最终」是页粒度，此刻是 section 粒度
@@ -434,7 +435,7 @@ stext ─ safe_svcmode_maskall ─ MIDR→__lookup_processor_type ─ r8=PHYS_OF
 ## ✅ 落地校验清单（Checklist）
 
 > [!SUCCESS] 内核 head.S 启动路径必过
-> - [ ] **自解压建表自保护**：`__setup_mmu` 前判定 `r4-16K` 页表区不与自身重叠，否则跳过 cache_on + 用 `r4` 最低位记账（head.S:318-330）
+> - [ ] **自解压建表自保护**：`__setup_mmu` 前判定 `r4-16K` 页表区不与自身重叠，否则跳过 cache_on + 用 `r4` 最低位记账（head.S:317-329）
 > - [ ] **解压收尾刷行**：`cache_clean_flush → cache_off → __enter_kernel(r0=0, r1=arch_id, r2=dtb)`，`r0` 不跨 `bl`
 > - [ ] **`stext` 入参**：`MMU=off / D-cache=off`，`r1=arch_id / r2=dtb`；`safe_svcmode_maskall` 后进 SVC
 > - [ ] **SMP_ON_UP 探测**：按 MIDR→ARM11MPCore→MPIDR→(A9)SCU 逐级自适应；A9 SCU 基址为 0 判 UP，链上结果写 `.alt.smp.init` 并靠 `flush_icache_range` 保一致

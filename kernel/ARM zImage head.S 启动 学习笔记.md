@@ -15,7 +15,7 @@ created: 2026-09-30
 # 🚀 ARM zImage head.S 启动 学习笔记
 
 > [!INFO] 笔记概览
-> - **定位**：逐行剖析 `arch/arm/boot/compressed/head.S` 的 zImage 自解压壳，目标 i.MX6ULL / Cortex-A7 / Linux lf-6.18.y。
+> - **定位**：逐行剖析 `arch/arm/boot/compressed/head.S` 的 zImage 自解压壳，目标 i.MX6ULL / Cortex-A7 / Linux 7.3.0-rc6（mainline）。
 > - **内容范围**：PIC 重定位 · 字节序 · 入口结构 · 内核落点 r4 · appended DTB 合并 · 撞车判定与 relocate · GOT/BSS 铺床 · 解压交棒 · XIP 对照 · ARMv7 CP15 · `__setup_mmu` 建表
 > - **推荐路径**：§1 启动主线 → §2 落点 r4 → §3 appended DTB → §4 撞车/relocate → §5 GOT/BSS → §6 解压交棒 → §7 XIP → §8 CP15 速查 → §9 `__setup_mmu`
 
@@ -287,7 +287,7 @@ DEBUG 模式故意不 `orr #0x0d` → 不开 MMU，保串口。
 
 ---
 
-## 🗃️ 9. __setup_mmu 详解（head.S:794-833）
+## 🗃️ 9. __setup_mmu 详解（head.S:793-832）
 
 ### 9.1 任务定位
 
@@ -403,7 +403,7 @@ ARM 上"这次访问走不走 cache"的属性只有两个来源：
 
 ## 📚 参考资料
 
-1. **Linux 内核源码** — *arch/arm/boot/compressed/head.S*（本笔记主线，lf-6.18.y：PIC、落点、DTB、relocate、cache）.
+1. **Linux 内核源码** — *arch/arm/boot/compressed/head.S*（本笔记主线，7.3.0-rc6：PIC、落点、DTB、relocate、cache）.
 2. **Linux 内核源码** — *arch/arm/boot/compressed/misc.c*（`decompress_kernel` 与 bump allocator；piggy 尾部 size 的读取端）.
 3. **ARM** — *ARM Architecture Reference Manual (ARMv7-A/R)*, Appendix / CP15 (p15 c0~c15、SCTLR、TTBR、DACR、cache 操作编码）.
 4. **NXP** — *i.MX6ULL Reference Manual*（Cortex-A7 MPCore、RAM/外设布局与启动地址）.
