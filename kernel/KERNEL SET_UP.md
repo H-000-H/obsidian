@@ -584,7 +584,7 @@ flowchart TD
 - [[ARM Kernel head.S 内核启动 学习笔记]] — 从汇编视角看 `head.S` 如何先建临时映射、装 TTBR1，再让位给 `setup_arch()`
 - [[ARM zImage head.S 启动 学习笔记]] — bootloader→内核入口的宏观前置流程
 - [[kernel 中断系统（ARM32）学习笔记]] — `devicemaps_init()` 建的 `0xffff0000` 高端向量表与异常分发的关系
-- [[init_main.c pid0-pid1 - pid2]] — `start_kernel()` 内 `setup_arch()` 前后的整体时序与 PID 演化
+- [[init.main.c]] — `start_kernel()` 内 `setup_arch()` 前后的整体时序与 PID 演化
 - [[常用寄存器]] — CP15 相关寄存器（MIDR/MPIDR/TTBR1）参考
 
 ---
