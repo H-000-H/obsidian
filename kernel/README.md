@@ -20,12 +20,12 @@ kernel: "7.3.0-rc6 (mainline)"
 
 ## 🧷 版本基线（重要）
 
-| 项 | 值 |
-| --- | --- |
-| **内核版本** | **Linux 7.3.0-rc6**（mainline，`torvalds/linux` master） |
-| **源码树路径** | `/home/h-000-h/project/linux-source-code` |
+| 项          | 值                                                     |
+| ---------- | ----------------------------------------------------- |
+| **内核版本**   | **Linux 7.3.0-rc6**（mainline，`torvalds/linux` master） |
+| **源码树路径**  | `/home/h-000-h/project/linux-source-code`             |
 | **树 HEAD** | `7b63ef2d5`（2026-10-07，`Merge tag 'for-7.3-rc6-tag'`） |
-| **平台重点** | ARM32（i.MX6ULL / Cortex-A7）为主，兼有通用子系统 |
+| **平台重点**   | ARM32（i.MX6ULL / Cortex-A7）为主，兼有通用子系统                 |
 
 > [!IMPORTANT] 全库版本基线：7.3.0-rc6
 > 所有笔记的结论与 `文件:行号` 引用均以 **Linux 7.3.0-rc6（mainline）** 为准，并已逐条对照该源码树核实。

@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "kernel/README.md",
-                "mode": "source",
-                "source": false
+                "file": "kernel/sh语法.md",
+                "mode": "preview",
+                "source": true
               },
               "icon": "lucide-file",
-              "title": "README"
+              "title": "sh语法"
             }
           }
         ]
@@ -236,10 +236,14 @@
       "smart-connections:Toggle Footer Connections": false
     }
   },
-  "active": "526f14c1cc723f47",
+  "active": "c2e99e25a98bf026",
   "lastOpenFiles": [
-    "kernel/未命名 1.md",
+    "kernel/Linux 设备模型/kobject-sysfs-kernfs映射分层.md",
+    "kernel/memory/kernel mm视图.md",
+    "kernel/sh语法.md",
+    "kernel/Linux 设备模型",
     "kernel/README.md",
+    "kernel/未命名 1.md",
     "kernel/init.main.c.md",
     "kernel/kernel 中断系统（ARM32）学习笔记.md",
     "kernel/ARM Kernel head.S 内核启动 学习笔记.md",
@@ -252,7 +256,6 @@
     "kernel/调度算法/linux/cfs.md",
     "kernel/常用寄存器.md",
     "kernel/arm 汇编 补充.md",
-    "kernel/memory/kernel mm视图.md",
     "kernel/memory/mmu.c kernel起步.md",
     "kernel/memory/lowmem 与 highmem.md",
     "kernel/memory/页表预分配 mmu.c.md",
@@ -264,9 +267,7 @@
     "kernel/memory",
     "English/2026-9-23.md",
     "English/2026-9-22.md",
-    "网络协议/协议核心/IP.md",
     "kernel",
-    "网络协议/协议核心/UDP.md",
     "English/未命名.canvas",
     "English/未命名.base",
     "Learning-log/未命名.base",
@@ -274,7 +275,6 @@
     "English",
     "网络协议/协议核心/TLS/TLS.md.tmp.43228.1789977360033",
     "网络协议/协议核心/FTP.md.tmp.43228.1789977346802",
-    "网络协议/协议核心/FTP.md.tmp.43228.1789977289750",
     "renode-use/笔记.canvas",
     "通信和外设协议/Excalidraw/I2C.svg",
     "通信和外设协议/Excalidraw/SPI.svg",
