@@ -164,21 +164,6 @@ dma_map_page() 只算出 bus address(= PA) 交给设备
 
 ---
 
-## ✅ 落地校验清单（Checklist）
-
-> [!SUCCESS] 内存地址操作必过
-> - [ ] **分界变量**：认清 `arm_lowmem_limit`（PA 侧）与 `high_memory`（direct map 顶，仅此一用）
-> - [ ] **zone 划分**：`zone_sizes_init()` 把 `max_low` / `max_high` 分别喂给 `ZONE_NORMAL` / `ZONE_HIGHMEM`
-> - [ ] **能力对照**：`__va / __pa` 只用 lowmem；highmem 一律走 `pfn_to_page` + `kmap`
-> - [ ] **页表行踪**：老式页表只落 lowmem PA；highmem 的 `page_address()` 绝不可写进页表
-> - [ ] **kmap 纪律**：`kmap_atomic` 槽不可睡眠、不可嵌套过深、用完即 `kunmap_local`
-> - [ ] **kmalloc 取值**：默认从 lowmem 分配，不依赖可读性差的 highmem 页
-> - [ ] **启动阶段**：`memblock_set_current_limit` 把早期分配压到 lowmem，`early_alloc` 只挑已映射页
-> - [ ] **DMA 路径**：普通场景 `dma_map_page` 直用 bus address；仅当 PA 超出 32 位 mask 才走 swiotlb bounce buffer
-> - [ ] **vm_insert_page**：依赖 vmalloc 区自填 PTE，不依赖 direct map，highmem 也可用
-
----
-
 ## 🔗 思考与延伸索引
 
 - [[KERNEL_SET_UP]] — 内核启动进入 C 世界前的页表与内存准备

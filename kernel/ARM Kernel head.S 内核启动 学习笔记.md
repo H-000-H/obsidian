@@ -432,21 +432,6 @@ stext ─ safe_svcmode_maskall ─ MIDR→__lookup_processor_type ─ r8=PHYS_OF
 
 ---
 
-## ✅ 落地校验清单（Checklist）
-
-> [!SUCCESS] 内核 head.S 启动路径必过
-> - [ ] **自解压建表自保护**：`__setup_mmu` 前判定 `r4-16K` 页表区不与自身重叠，否则跳过 cache_on + 用 `r4` 最低位记账（head.S:317-329）
-> - [ ] **解压收尾刷行**：`cache_clean_flush → cache_off → __enter_kernel(r0=0, r1=arch_id, r2=dtb)`，`r0` 不跨 `bl`
-> - [ ] **`stext` 入参**：`MMU=off / D-cache=off`，`r1=arch_id / r2=dtb`；`safe_svcmode_maskall` 后进 SVC
-> - [ ] **SMP_ON_UP 探测**：按 MIDR→ARM11MPCore→MPIDR→(A9)SCU 逐级自适应；A9 SCU 基址为 0 判 UP，链上结果写 `.alt.smp.init` 并靠 `flush_icache_range` 保一致
-> - [ ] **页表现场算**：`__create_page_tables` 清 PG_DIR_SIZE → 1:1 段 for `__turn_mmu_on` → 高地位内核段 → DTB 2 section → DEBUG_LL
-> - [ ] **合闸时序**：先 `__v7_setup`（TTBCR/TTBR0/TTBR1）→ `__enable_mmu`（DACR+TTBR0）→ `__turn_mmu_on`（`.idmap.text` `.align 5`）→ `ret r13` 高位；合闸与 ret 之间锚定在 1:1 浮桥内
-> - [ ] **栈落地**：主核 `__mmap_switched` 挂 `init_thread_union+THREAD_START_SP`（=CPU0 idle 栈）→ 清 .bss → `set_current` init_task → `start_kernel`；从核先 TTBR1→TTBR0 再装本核 idle 栈
-> - [ ] **拆桥时序**：`paging_init→prepare_page_table` 拆 1:1 时 `PC/SP/Data` 已迁高位；`local_flush_tlb_all` 本地冲刷即可
-> - [ ] **权限粒度**：明了 `paging_init()` 交付的是 section 近似（`__init_end` 为界 X/NX），页级 RO/NX 延后到更晚路径
-
----
-
 ## 🔗 思考与延伸索引
 
 - [[ARM zImage head.S 启动 学习笔记]] — 两幕大戏的第一幕：自带重定位/页表/malloc 的自解压壳如何铺 4GB 表、解压并交棒 `stext`

@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "kernel/sh语法.md",
+                "file": "kernel/Linux 设备模型/file_operations 与字符设备结构精读.md",
                 "mode": "preview",
                 "source": true
               },
               "icon": "lucide-file",
-              "title": "sh语法"
+              "title": "file_operations 与字符设备结构精读"
             }
           }
         ]
@@ -236,11 +236,15 @@
       "smart-connections:Toggle Footer Connections": false
     }
   },
-  "active": "c2e99e25a98bf026",
+  "active": "526f14c1cc723f47",
   "lastOpenFiles": [
+    "kernel/Linux 设备模型/platform-resource-mfd 结构精读.md",
+    "kernel/Linux 设备模型/file_operations 与字符设备结构精读.md",
+    "kernel/Linux 设备模型/kobject 与 module_kobject 结构精读.md",
+    "kernel/Linux 设备模型/struct device 精读.md",
     "kernel/Linux 设备模型/kobject-sysfs-kernfs映射分层.md",
-    "kernel/memory/kernel mm视图.md",
     "kernel/sh语法.md",
+    "kernel/memory/kernel mm视图.md",
     "kernel/Linux 设备模型",
     "kernel/README.md",
     "kernel/未命名 1.md",
@@ -261,12 +265,8 @@
     "kernel/memory/页表预分配 mmu.c.md",
     "kernel/memory/完成清单.md",
     "kernel/memory/arm mm init.c.md",
-    "English/2026-9-24.md",
-    "English/templete.md",
     "kernel/init_main.c",
     "kernel/memory",
-    "English/2026-9-23.md",
-    "English/2026-9-22.md",
     "kernel",
     "English/未命名.canvas",
     "English/未命名.base",

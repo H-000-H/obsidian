@@ -552,23 +552,6 @@ ssh -W internal-gw:22 ops@bastion                   # ProxyJump 的底层实现
 
 ---
 
-## ✅ 落地校验清单（Checklist）
-
-> [!SUCCESS] SSH 服务/客户端上线前必过
-> - [ ] **协议版本**：仅接受 `SSH-2.0-*`，`Protocol 2` 语义下 1.x 客户端一律拒绝
-> - [ ] **算法白名单**：KEX 用 `curve25519-sha256`/GEX-SHA256；主机密钥 `ssh-ed25519`/`rsa-sha2-512`；加密用 AEAD 或 CTR；MAC 用 `*-etm@openssh.com`；禁用 `ssh-rsa`(SHA-1)、`group1*`、`3des`、`arcfour`
-> - [ ] **主机密钥信任**：首次指纹经带外核对；`known_hosts` 已集中分发或改走 SSH 证书；对 `REMOTE HOST IDENTIFICATION HAS CHANGED` 有响应流程
-> - [ ] **认证**：`PasswordAuthentication no` + `KbdInteractiveAuthentication no`；`PermitRootLogin no|prohibit-password`；`AllowUsers/AllowGroups` 白名单；`MaxAuthTries` 收敛
-> - [ ] **密钥与权限**：私钥/`authorized_keys` `600`、`~/.ssh` `700`、home 不可 group 写；`StrictModes yes` 未被关成 `no`
-> - [ ] **转发策略**：`AllowTcpForwarding`/`PermitOpen`/`PermitListen` 最小化；`GatewayPorts no`；`AllowAgentForwarding no`；X11 按需
-> - [ ] **完整性与会话**：`RekeyLimit` 显式（默认 1 GiB/1 h 可接受）；确认 `hmac-*-etm` 生效；ETM/AEAD 优先
-> - [ ] **可用性**：`ClientAliveInterval/CountMax` 清理僵尸会话；`MaxStartups` 限速；`Banner` 合规告示；`LogLevel VERBOSE` 保留公钥指纹日志
-> - [ ] **防爆破**：fail2ban/sshguard + `ignoreip` 白名单 + 递进 `bantime`；日志接入 SIEM
-> - [ ] **跳板链路**：每一跳 `AllowTcpForwarding` 已开、`ProxyJump` 多跳可连通、审计按会话留痕
-> - [ ] **客户端**：`IdentitiesOnly yes` 防 agent 广播所有 key；`-o ExitOnForwardFailure=yes` 让转发失败可见；脚本 `ssh host cmd` 依赖 `exit-status` 判定成败
-
----
-
 ## 🔗 思考与延伸索引
 
 - [[TCP]] —— SSH 的分帧与"粘包"问题本质是 TCP 字节流之上的报文定界；`packet_length` 即自描述定界方案；rekey 期间的阻塞与 TCP 重传叠加造成卡顿

@@ -234,20 +234,6 @@ analyzers default sysbus.usart2   # 默认分析器 id
 
 ---
 
-## ✅ 落地校验清单（Checklist）
-
-> [!SUCCESS] 外设仿真前逐条核对
-> - [ ] **UART 对接**：按需选 Analyzer / TCP / 文件后端 / pty / uart_connect
-> - [ ] **TCP 握手**：对端非 telnet 时，用 `false` 关闭 IAC 握手字节
-> - [ ] **LED/按键**：`.repl` 里 `->` 连接引脚号正确，`invert` 与硬件电平一致
-> - [ ] **子外设挂载**：`machine LoadPlatformDescription @./xxx.repl` 单独挂载成功
-> - [ ] **交换机/Hub**：默认暂停态，记得 `Start`（或随整车 `start` 自动启动）
-> - [ ] **CAN 桥接**：SocketCAN 仅 Linux，`ensureFdFrames` 按是否 CAN-FD 设置
-> - [ ] **GPIOConnector**：单向连接，双向需建两个反向 connector
-> - [ ] **分析器查询**：不确定就先 `analyzers sysbus.<外设>`
-
----
-
 ## 🔗 思考与延伸索引
 
 - [[renode用法]] — 启动模式、Monitor 命令、机器生命周期与 `.resc` 脚本

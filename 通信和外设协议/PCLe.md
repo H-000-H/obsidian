@@ -549,27 +549,6 @@ $$
 
 ---
 
-## ✅ 落地校验清单（Checklist）
-
-> [!SUCCESS] PCIe 链路设计与调试必过
-> - [ ] **拓扑与 Lane**：x1/x4/x8/x16 与目标设备一致；差分对**交叉连接**（TX±→RX±）、极性可反转、支持 Lane Reversal
-> - [ ] **电气**：AC 耦合电容值与位置正确、差分阻抗 85/100 Ω、对内/对间 skew 在预算内、参考时钟 100 MHz 与 ±300 ppm（SRNS/SRIS 选择明确）
-> - [ ] **速率与均衡**：实测 `Current Link Speed` 达设计代次（注意 64 GT/s 是 **Gen6**）；Gen3+ 均衡 Phase 0~3 与 preset 已调；`Recovery` 进入计数为 0
-> - [ ] **链路宽度**：`Negotiated Link Width` 等于设计值；无单 Lane 掉线
-> - [ ] **LTSSM**：能稳定停在 **L0**；Polling/Configuration 无反复；Disable/Hot Reset 非预期时先查 PERST# 时序
-> - [ ] **编码/SKP**：Gen3+ 对齐依赖 block/SDS（无 COMMA）；SKP 溢出/弹性缓冲计数为 0
-> - [ ] **MPS / MRRS**：路径上**所有**设备 MPS 取最小值且无冲突；MRRS 与读带宽目标匹配
-> - [ ] **流控 Credit**：InitFC1/InitFC2/UpdateFC 正常；Credit 总量 ≥ 往返时延 × 目标带宽；无 `Flow Control Protocol Error`
-> - [ ] **重传与完整性**：NAK/Replay 计数低；`REPLAY_TIMER_TIMEOUT` 计数为 0；ECRC/Poisoned 策略明确
-> - [ ] **排序**：多队列 DMA + 完成标志是否满足"数据先于标志可见"（RO 位设置正确）
-> - [ ] **配置空间**：BAR 写全 1 读回掩码算尺寸正确、64 位 BAR 占两个槽；桥的 Memory/Prefetch/IO 窗口覆盖所有子树
-> - [ ] **枚举**：VID/DID 可读、`Header Type` 判定桥、Bus 号区间（Primary/Secondary/Subordinate）无重叠
-> - [ ] **中断**：MSI/MSI-X 使能且向量数足够；INTx 场景 `INTx Disable` 与状态清除顺序正确
-> - [ ] **电源**：ASPM/L1 子状态与 `L1 Exit Latency` 满足实时性要求；D3cold 后有完整重初始化路径
-> - [ ] **错误上报**：AER（Correctable / Uncorrectable）已配置并可观测；`Device Status` 的 Non-Fatal/Fatal 被处理
-
----
-
 ## 🔗 思考与延伸索引
 
 - [[UART]] — 同为"分层与电气解耦"的典型：UART 靠约定波特率自同步，PCIe 靠 **8 GHz 以上 CDR + SKP/Ordered Set** 自同步；对比两者"帧 vs 包"的差错控制差异

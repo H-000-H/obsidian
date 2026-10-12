@@ -294,22 +294,6 @@ set_pte_ext(ptep, pteval, ext);           // XPE 扩展位：AP/TEX 打包进 PM
 
 ---
 
-## ✅ 落地校验清单（Checklist）
-
-> [!SUCCESS] 梳理 mmu.c 施工链路前必过
-> - [ ] **定位**：只搭 VA→PA 页面施工，页框分配（Buddy）在 `mm/page_alloc.c` 属后续
-> - [ ] **`adjust_lowmem_bounds` 调用两次**：`arm_memblock_init` 前后各一次；节点不在 `paging_init` 内
-> - [ ] **首 bank 保留**：`prepare_page_table` 不清第一个 memory bank（运行中替换沿用）
-> - [ ] **低/high 心智模型**：是"lowmem 上限外内存删除或留 highmem"，不是"切成两块映射"
-> - [ ] **map_kernel 两段**：仅 section 粒度，`MT_MEMORY_RWX`(.text+.init)/`MT_MEMORY_RW`；精细 RX/RO/RW 在之后做
-> - [ ] **kernel 抠洞**：kernel 落 VMALLOC 区时从 lowmem 凿掉该段（case 1~6）
-> - [ ] **fixmap 转正**：`early_fixmap_shutdown` 只转 `DEV_SHARED` 为 `MT_DEVICE`，fixmap 机制继续存在
-> - [ ] **execmem 位置**：模块区在 `PAGE_OFFSET` 之下（非 vmalloc 层），见 [[arm mm init.c]]
-> - [ ] **IMX6ULL**：未开 LPAE，`early_paging_init` 的 PV_FIXUP 路径不涉及
-> - [ ] **Buddy 接管边界**：`memblock_free_all()` 后才轮到 `mm/page_alloc.c`
-
----
-
 ## 🔗 思考与延伸索引
 
 - [[arm mm init.c]] — 同一链路的"收尾总管"：memblock/zone/RWX/init 回收 与 `arch_mm_preinit`

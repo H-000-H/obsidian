@@ -554,25 +554,6 @@ lftp -u alice,*** ftp://ftp.example.com -e 'set net:max-retries 3; mirror -c --p
 
 ---
 
-## ✅ 落地校验清单（Checklist）
-
-> [!SUCCESS] FTP 部署与联调必过
-> - [ ] **是否真的需要 FTP**：先评估 SFTP（单端口/加密/密钥认证）与 HTTPS 分发；确认无法替换再上 FTP，并把"明文"这一事实写进风险登记
-> - [ ] **模式统一**：服务端只允许被动（`pasv_enable=YES`，禁 `PORT`），客户端 `-p`/`--passive`/`EPSV`；两端不要一半主动一半被动
-> - [ ] **被动端口段**：`pasv_min_port`/`pasv_max_port`（或 `PassivePorts`）已配置，宽度 ≥ 峰值并发×1.5，并在安全组/iptables/云防火墙**显式放行**
-> - [ ] **NAT/云地址**：`pasv_address`（`MasqueradeAddress`）填公网 IP；确认不依赖 `nf_conntrack_ftp` ALG（尤其上了 FTPS 时）
-> - [ ] **TYPE 正确**：脚本显式 `TYPE I`；任何二进制资源不得走 `TYPE A`（防 CRLF 改坏内容）
-> - [ ] **完整性复核**：传输后用 `SIZE` 比对字节数，落地后校验 hash/签名；不把 `226` 当作"内容正确"的证据
-> - [ ] **断点续传**：`FEAT` 支持 `REST STREAM` 才用 `REST`；比对 `MDTM`/hash 决定续传或重传；`REST` 后紧跟传输命令
-> - [ ] **锁步与并发**：单会话内不并发发命令（避免 `503`/应答错配）；批量用小文件打包，用 `lftp -j N` 多会话提速
-> - [ ] **匿名与权限**：`anonymous_enable=NO`（除非确有公开镜像需求，开启则只读 + 上传目录禁下载）；`chroot_local_user=YES` 且根目录属主非登录用户、不可写（否则 vsftpd 报 `500 OOPS: refusing to run with writable root inside chroot()`）
-> - [ ] **超时与观测**：`idle_session_timeout`/`data_connection_timeout`/`accept_timeout`/`connect_timeout` 均有界并配 NOOP/重连兜底；采集在线会话数、被动端口占用率、`xferlog` 失败率、出口带宽，`fail2ban` 覆盖 21 端口
-> - [ ] **FTPS 参数**：`AUTH TLS` 强制、`PBSZ 0`+`PROT P`、`require_ssl_reuse=YES`、证书链完整且主机名匹配；不允许回退明文
-> - [ ] **凭据卫生**：不内联口令于命令行/URL/日志；`_netrc` 权限 600；开启 `log_ftp_protocol` 但确保日志不落口令
-> - [ ] **排障基线**：能读 `220/331/230/227/150|125/226` 正常序列；出现 `425` 查端口段与地址，`530` 查账号，`550` 查权限/chroot/`write_enable`，`503` 查命令顺序
-
----
-
 ## 🔗 思考与延伸索引
 
 - [[TCP]] — FTP 的承载层：控制/数据两条连接各自的三次握手与 FIN 语义，"数据结束 = 连接关闭"依赖的正是 TCP 的有序可靠交付

@@ -403,24 +403,6 @@ for (;;) {
 
 ---
 
-## ✅ 落地校验清单（Checklist）
-
-> [!SUCCESS] UDP 链路设计与排错前必过
-> - [ ] **首部三数记牢**：$8\ \text{B}$ 首部；长度字段含首部（$8 \sim 65535$）；IPv4 净载上限 $65507\ \text{B}$
-> - [ ] **封装开销**：以太网 + IPv4 + UDP = $14+20+8=42\ \text{B}$（IPv6 为 $62\ \text{B}$），效率按 $L/(L+46)$ 估算
-> - [ ] **不分片尺寸**：以太网取 $1500-20-8=1472\ \text{B}$ 上限，工程值取 $1200\sim1400\ \text{B}$；有隧道/PPPoE 再预留 $8\sim20\ \text{B}$
-> - [ ] **校验和别关**：IPv6 必须非 0；只在被证明必要的隧道场景允许 IPv4 填 0；排错时注意 checksum offload 假象（`ethtool -K ... off` 复核）
-> - [ ] **可靠性由应用负责**：序号（≥24 bit）+ ACK/SACK + RTO（RFC 6298 + Karn）+ 去重 + 心跳 + 幂等；明确"哪些数据过期即丢"
-> - [ ] **分片在应用层**：`session_id + msg_id + frag_index + frag_total`，带**重组超时**与**未完成消息内存上限**，禁止依赖 IP 分片
-> - [ ] **实时业务配 FEC**：$\text{RS}(n+k,n)$ 或 XOR + **时间交织**，与码率/拥塞控制联动，不拿 FEC 抗拥塞
-> - [ ] **错误处理不吞返回值**：`sendto` 判 `== len`（含截断），`EINTR/EAGAIN/EMSGSIZE/ENOBUFS/EACCES` 分开处理；需要 ICMP 差错就 `connect()` + `MSG_ERRQUEUE`
-> - [ ] **可观测性**：`netstat -su` / `nstat` 的 `RcvbufErrors`、`SndbufErrors`、`NoPorts`、`InCsumErrors` 上监控；应用侧统计丢包率、乱序率、重传率、抖动
-> - [ ] **缓冲与扩缩**：`SO_RCVBUF`/`SO_SNDBUF`（受 `rmem_max`/`wmem_max` 限制）、`recvmmsg` 批收、`SO_REUSEPORT` 多进程分担、单核 softirq 瓶颈看 `/proc/net/softnet_stat`
-> - [ ] **组播/广播清单**：`SO_BROADCAST`、`IP_ADD_MEMBERSHIP` + 指定网卡、`IP_MULTICAST_TTL/IF/LOOP`、`IP_PKTINFO` 同源回包
-> - [ ] **NAT/防火墙**：心跳间隔 < 会话超时的 $1/2$；穿透场景用 STUN/TURN；别指望 `SO_KEEPALIVE`
-
----
-
 ## 🔗 思考与延伸索引
 
 - [[TCP]] — 可靠传输的另一半：状态机、滑动窗口、拥塞控制与队头阻塞（对比 §5）

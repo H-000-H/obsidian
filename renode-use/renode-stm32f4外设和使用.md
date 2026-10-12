@@ -234,18 +234,6 @@ sysbus.usart2                         # 不带参数 = 列出该外设全部属�
 
 ---
 
-## ✅ 落地校验清单（Checklist）
-
-> [!SUCCESS] 建平台后逐条核对
-> - [ ] **平台加载**：`machine LoadPlatformDescription @platforms/boards/stm32f4_discovery.repl`
-> - [ ] **外设核对**：`peripherals` 确认所需外设（usart/spi/i2c/can/dma）已建出且地址正确
-> - [ ] **模型匹配**：驱动 `compatible` / 寄存器基址与外设模型地址范围一致
-> - [ ] **板载外设**：`UserButton`（gpioPortA）、`UserLED`（gpioPortD）可直接引用
-> - [ ] **DMA 地址**：DMA 源/目的地址落在正确外设 DATA 寄存器
-> - [ ] **未映射告警**：访问到树里没有的地址会告警，据此补 `.repl` 或核对固件
-
----
-
 ## 🔗 思考与延伸索引
 
 - [[renode用法]] — 机器生命周期、平台加载、固件加载与 `.resc` 脚本

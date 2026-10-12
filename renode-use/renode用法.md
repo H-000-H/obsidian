@@ -224,20 +224,6 @@ GPIO 按键、LED 等常用外设的用法见 [[renode外设仿真]]。
 
 ---
 
-## ✅ 落地校验清单（Checklist）
-
-> [!SUCCESS] 跑通一次仿真前逐条核对
-> - [ ] **启动模式**：交互用图形/控制台，CI 用 `--disable-gui`
-> - [ ] **机器上下文**：多机时先 `mach set` 切到目标机器
-> - [ ] **平台加载**：`LoadPlatformDescription` 后 `peripherals` 确认外设齐全
-> - [ ] **外设连接**：串口/网络先 `Create...Terminal` 再 `connector Connect`
-> - [ ] **固件入口**：多 ELF 时注意最后一个决定入口 PC，必要时手设 `VectorTableOffset`
-> - [ ] **默认暂停**：建机后需 `start` 才运行
-> - [ ] **脚本复现**：把整套流程写进 `.resc`，`renode xxx.resc` 一键复现
-> - [ ] **单步陷阱**：`Step false` 会推进虚拟时间，调试优先用 GDB
-
----
-
 ## 🔗 思考与延伸索引
 
 - [[renode外设仿真]] — UART / GPIO / LED / 按键 / CAN 等外设的仿真与可视化

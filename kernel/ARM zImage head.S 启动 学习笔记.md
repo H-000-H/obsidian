@@ -376,21 +376,6 @@ ARM 上"这次访问走不走 cache"的属性只有两个来源：
 
 ---
 
-## ✅ 落地校验清单（Checklist）
-
-> [!SUCCESS] zImage 启动路径必过
-> - [ ] **落点**：AUTO 下 zImage 位于 RAM base 首格 128MB 内且 base 128MB 对齐；判定 `r4` 与 DTB memory 一致
-> - [ ] **约定传参**：U-Boot 按 new-ABI 传 `r0=0 / r1=arch_id(dtb) / r2=atags`，保留 r7/r8/r9
-> - [ ] **appended DTB**：追尾 DTB 的 totalsize 合法、合并且 `r6/r10/sp` 已 `+r5` 划盘；追加时提前校正落点
-> - [ ] **piggy 尾字节**：镜像构建补齐末尾 u32 解压 size（R9 权威来源），非 4 字节对齐字段已手工拼接
-> - [ ] **relocate 余量**：撞车时新家 `r4+r9+`（reloc 长，256 对齐）足量、倒序拷贝不重叠、`r4` 不动
-> - [ ] **无符号比较**：地址/尺寸区间判定统一 `blo/bhs`（无符号），避免 `blt/bge` 符号位误判
-> - [ ] **cache 一致性**：`cache_on` 存在时 `cache_clean_flush` 覆盖 `[r4, r4+真实 size)`；用 `get_inflated_image_size` 而非虚增后的 r9
-> - [ ] **点火顺序**：CP15 按「表 → 域 → ISB → M → ISB」刷写；`__turn_mmu_on` 于 `.idmap.text` 且 `.align 5`
-> - [ ] **XIP 排布**：若用 `ZBOOT_ROM`，`zreladdr/BSS/heap/DTB` 人工排布互不重叠
-
----
-
 ## 🔗 思考与延伸索引
 
 - [[ARM Kernel head.S 内核启动 学习笔记]] — 两幕大戏的第二幕：真正的 `stext` 从无栈裸机手搭页表到高位虚拟跃迁

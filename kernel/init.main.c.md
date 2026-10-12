@@ -25,7 +25,7 @@ upstream-doc: "[[KERNEL SET_UP]]"
 > [!INFO] 笔记概览
 > - **定位**：`init/main.c` 是内核从**裸机/汇编入口一路走到用户态 `/sbin/init`** 的总调度文件。它管三件事：① 把 bootloader 传来的命令行**解析并分流**；② 用 **initcall 八级机制**把子系统与驱动全部初始化；③ 通过 `rest_init` 完成 **PID 1 / PID 2 / PID 0** 三方交接，最终由 PID 1 `exec` 出用户态 init。
 > - **内容范围**：命令行三件套 · initcall 八级体系（含 `do_one_initcall`/黑名单/`initcall_debug`）· `.ctors` 构造函数 · `rest_init` 交接与 `kernel_clone` vs `kernel_thread` · `free_initmem` 竞态 · `kernel_init`/`kernel_init_freeable` 全流程 · init 候选链与 `init=` 陷阱 · `rodata` 安全开关。
-> - **推荐路径**：§1 总览图建立全局 → §2 命令行 → §3 initcall 八级（核心）→ §7 `rest_init` 交接 → §9 `kernel_init` 全流程 → §11 误区对照 → §13 Checklist 落地。
+> - **推荐路径**：§1 总览图建立全局 → §2 命令行 → §3 initcall 八级（核心）→ §7 `rest_init` 交接 → §9 `kernel_init` 全流程 → §11 误区对照。
 > - 本文所有结论均对照本仓库源码逐行核实，格式为 `文件:行号`。**本仓库 `init/main.c` 已被中文批注**（见 `:1406`、`:1431`、`:1632`、`:1704` 等处）。
 
 相关笔记：[[KERNEL SET_UP]] · [[ARM Kernel head.S 内核启动 学习笔记]]
@@ -431,21 +431,6 @@ early_param("rodata", set_debug_rodata);
 3. **串口日志顺序**即执行顺序：`Kernel command line: ...` → `Run /sbin/init as init process`（`:1772`）。
 4. **`/proc/cmdline`** 来自 `saved_command_line`（§2.1）；`Unknown kernel command line parameters ...` 提示哪些透传了 init。
 5. **`init=` 救援**：`init=/bin/bash` 掉进 root shell 修系统（记得 `mount -o remount,rw /`）。
-
----
-
-## ✅ 13. 落地校验清单（Checklist）
-
-> [!SUCCESS] 读通 `init/main.c` 主线前必过
-> - [ ] **主线**：能按 §1 图说出 `start_kernel → rest_init → PID1/2/0 → kernel_init_freeable → do_basic_setup → kernel_execve` 的完整链路
-> - [ ] **命令行**：说清 `saved_command_line` vs `static_command_line` 两条副本的作用，以及 early/模块/unknown/`--`/bootconfig 五路分流
-> - [ ] **八级 initcall**：背出 pure→late 8 级、知道 `module_init`=`device_initcall`=level 6、early 级由 `do_pre_smp_initcalls` 单独在 SMP 前跑
-> - [ ] **执行核心**：讲清 `do_one_initcall` 的黑名单 + trace + 抢占/IRQ 两道自愈检查
-> - [ ] **黑名单**：说出 `initcall_blacklist` 登记 + `initcall_blacklisted` 靠 kallsyms 反查比对的完整链路与 KALLSYMS 依赖
-> - [ ] **接通交接**：说清 `kernel_clone` vs `kernel_thread`（`.kthread=1`）、`kthreadd_done` 握手的真实方向
-> - [ ] **free_initmem 竞态**：解释 `rest_init` 为何必须 `noinline`/非 `__init` 收尾
-> - [ ] **init 候选链**：记住 `init=` 失败**直接 panic**，四路径只是兜底
-> - [ ] **rodata**：解释为何是 `early_param` 且落地在 `mark_readonly()`
 
 ---
 

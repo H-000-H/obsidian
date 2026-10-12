@@ -977,24 +977,6 @@ init.c
 
 ---
 
-## ✅ 落地校验清单（Checklist）
-
-> [!SUCCESS] 梳理 init.c 启动链路前必过
-> - [ ] **整体定位**：确认它只是"启动组织者"，Bug Buddy/vmalloc 实现在通用 `mm/` 子系统中
-> - [ ] **边界与换算**：`find_limits()` 得到 `min`/`max_low`/`max_high` 三 PFN；`PFN = PA / PAGE_SIZE`
-> - [ ] **DMA Zone 理解**：`ZONE_DMA` 是满足地址约束的 Zone，不是"DMA 专用内存"
-> - [ ] **三概念分离**：`pfn_valid`（存在）/ Zone（归属）/ Kernel VA（可映射）不混用
-> - [ ] **steal 语义**：`arm_memblock_steal` 是"从可管理 RAM 永久偷走"，`arm_memblock_init()` 后关闭
-> - [ ] **保留完整性**：`arm_memblock_init` 覆盖 kernel/initrd/platform/DT reserved/CMA
-> - [ ] **bootmem 名称**：`bootmem_init()` 已非传统 bootmem；Buddy 空闲页等 `memblock_free_all()`
-> - [ ] **SWIOTLB 触发**：仅当 `max_pfn > arm_dma_pfn_limit`；非所有 HIGHMEM 都走 SWIOTLB
-> - [ ] **VA 契约断言**：`TASK_SIZE ≤ MODULES_VADDR`、PKMAP 不顶到 `PAGE_OFFSET`，由 BUILD_BUG_ON 固化为契约
-> - [ ] **RWX 顺序**：RWX 收紧（`mark_rodata_ro`）在 Buddy 开工（`memblock_free_all`）之后
-> - [ ] **poison 顺序**：先 `poison` 后 `free`；`alloc_page(GFP_KERNEL)` 不保证清零，需 `__GFP_ZERO`
-> - [ ] **execmem 位置**：模块区在 `PAGE_OFFSET` 之下（非 vmalloc 层）；PLTS fallback 才是 vmalloc
-
----
-
 ## 🔗 思考与延伸索引
 
 - [[mmu.c kernel起步]] — 地址空间施工：`create_mapping` 链路与 VA 布局

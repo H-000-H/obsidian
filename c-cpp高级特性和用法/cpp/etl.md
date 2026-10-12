@@ -133,19 +133,6 @@ private:
 
 ---
 
-## ✅ 落地校验清单（Checklist）
-
-> [!SUCCESS] 用 ETL 萃取 / SFINAE 前逐条核对
-> - [ ] **placement new**：在已有缓冲上构造，配对调用析构，不 `malloc`/`delete`
-> - [ ] **缓冲对齐**：SBO 缓冲用 `alignas(max_align_t)`，避免未对齐访问
-> - [ ] **容量兜底**：`static_assert(sizeof(Fn) <= sizeof(storage))` 编译期拦超大捕获
-> - [ ] **先 decay 再比较**：类型判断前用 `decay_t` 去掉引用/顶层 const
-> - [ ] **排除自身**：包装构造用 `!is_same_v<decay_t<F>, Self>` 防误吞拷贝构造
-> - [ ] **SFINAE 开关**：用 `enable_if_t` 控制重载可见性，失败静默剔除而非报错
-> - [ ] **forward 保值类别**：存储时 `etl::forward<F>(f)`，不丢左/右值性质
-
----
-
 ## 🔗 思考与延伸索引
 
 - [[类型擦除与轻量 RTTI]] — placement new + invoke 指针构成的类型擦除全貌

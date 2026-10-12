@@ -195,20 +195,6 @@ auto p = std::move(someObject);      // 显式转成右值，触发移动而非�
 
 ---
 
-## ✅ 落地校验清单（Checklist）
-
-> [!SUCCESS] 嵌入式选容器前逐条核对
-> - [ ] **禁堆 STL**：不用 `std::vector`/`std::string`，改 `etl::vector<T,N>`/`etl::string<N>`
-> - [ ] **定长优先**：固定大小用 `array`（零开销、可 constexpr）
-> - [ ] **传参用视图**：缓冲传参用 `span`/`string_view`，不传裸 `(ptr,len)`
-> - [ ] **有无值**：返回用 `optional<T>`，杜绝 `-1`/`NULL` 哨兵歧义
-> - [ ] **回调**：热路径/禁堆用 `etl::function` 或函数指针，慎用 `std::function`
-> - [ ] **异常**：`.at()` 会抛异常，关异常工程用 `operator[]`
-> - [ ] **memcpy 前**：`static_assert(is_trivially_copyable_v<T>)` 兜底
-> - [ ] **move 克制**：能用 `const T&` 就别 `std::move`
-
----
-
 ## 🔗 思考与延伸索引
 
 - [[类型擦除与轻量 RTTI]] — `function` 的类型擦除机制与零堆 SBO 实现

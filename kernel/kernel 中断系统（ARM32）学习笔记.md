@@ -239,23 +239,6 @@ enum
 
 ---
 
-## ✅ 落地校验清单（Checklist）
-
-> [!SUCCESS] 中断系统验证必过
-> - [ ] **`irq_desc` 三大职责**：`irq_chip`（向下）、`action` 链（向上）、`handle_irq` 流控（中间）各归其位
-> - [ ] **安全阀门**：`handle_IRQ` 拦截非法中断并计入 `irq_err_count`，越界号不进入流控层
-> - [ ] **稀疏中断**：`CONFIG_SPARSE_IRQ` + 基数树按需分配，确认 `arch_probe_nr_irqs` 动态天花板
-> - [ ] **IPI 链路**：SGI 触发 → Reschedule / Call function 队列协作 → `/proc/interrupts` 可见统计
-> - [ ] **半部切分**：上半部只做 ACK+登记快退，耗时与阻塞逻辑全部下沉下半部
-> - [ ] **上下文纪律**：SoftIRQ / Tasklet 严禁睡眠；需睡眠逻辑一律 Workqueue（`kworker`）
-> - [ ] **SoftIRQ 自备锁**：同类型可跨核并行，共享数据必须自备锁
-> - [ ] **Tasklet 免锁边界**：同实例靠 `TASKLET_STATE_RUN` 防重入，跨类型仍要自备锁
-> - [ ] **软中断风暴熔断**：确认 10 次 / 2ms 限额与 `wakeup_softirqd` 兜底路径在场
-> - [ ] **内核栈红线**：`CONFIG_IRQSTACKS` 独立中断栈在列，且不在中断上下文做递归/大栈消耗
-> - [ ] **ksoftirqd 常态空闲**：稳态不触发熔断，长期满载则排查驱动软中断过载
-
----
-
 ## 🔗 思考与延伸索引
 
 - [[KERNEL SET_UP]] — ARM 内核启动流程：`start_kernel()` 进入 C 世界后中断子系统才开始建立

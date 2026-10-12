@@ -16,7 +16,7 @@ kernel: "7.3.0-rc6 (mainline)"
 > [!INFO] 笔记概览
 > - **定位**：页表预分配（`mmu.c`）中内存缓存策略的**一张速查表**，无冗长讲解、只供快速查用。用于在页表/物理内存映射时决定某段内存采用哪种缓存策略（uncached / buffered / writethrough / writeback / writealloc）。
 > - **内容范围**：五种缓存策略在读命中、读不命中、写命中、写不命中时的行为，以及写回时机。
-> - **推荐路径**：直接看下面 §1 速查表 → 对照 §2 关键差异点把握取舍 → 落地校验清单核对自己的策略选择。
+> - **推荐路径**：直接看下面 §1 速查表 → 对照 §2 关键差异点把握取舍。
 
 ---
 
@@ -43,17 +43,6 @@ kernel: "7.3.0-rc6 (mainline)"
 
 > [!TIP] 快速记忆
 > 从"最省电、无缓存"到"写回延时"可作如下排序：`uncached`（完全傍路）→ `buffered`（写缓冲）→ `writethrough`（每写同步）→ `writealloc`（写不命中先分配）→ `writeback`（延迟写回，性能最优但一致性责任最大）。
-
----
-
-## ✅ 落地校验清单（Checklist）
-
-> [!SUCCESS] 选择缓存策略前必过
-> - [ ] **用途匹配**：MMIO / 设备寄存器用 `uncached` 或 `buffered`；DMA 缓冲需核对一致性需求
-> - [ ] **写分配语义**：确认写不命中时是否需要先分配到缓存（`writealloc`）还是直接写内存（`writethrough`/`writeback`）
-> - [ ] **写回时机**：`writeback`/`writealloc` 必须安排好缓存刷新（cache flush / 行替换），避免脏数据滞留
-> - [ ] **一致性**：`writethrough` 实时同步最稳但慢；`writeback` 高效但需要主动同步内存
-> - [ ] **与页表映射对应**：在 `mmu.c` 页表/物理内存映射处按需选择对应 `mem_type`（见 [[arm mm init.c]] 的 `build_mem_type_table`）
 
 ---
 

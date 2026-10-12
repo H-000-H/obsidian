@@ -297,21 +297,6 @@ showAnalyzer sysbus.uart
 
 ---
 
-## ✅ 落地校验清单（Checklist）
-
-> [!SUCCESS] 调试环境搭建前逐条核对
-> - [ ] **GDB Server**：`machine StartGdbServer 3333` 放在 `.resc` 最后一行
-> - [ ] **自动启动**：简单场景用 `StartGdbServer 3333 true`，省去手工 `start`
-> - [ ] **多核指定**：异构 CPU 用 `cpuCluster=` 或 `sysbus.cpuN` 明确目标核
-> - [ ] **VSCode 就绪等待**：`problemMatcher.endsPattern` 匹配 GDB server started 日志
-> - [ ] **单步模式**：用完 `SingleStepBlocking` 记得切回 `Continuous`
-> - [ ] **日志级别**：NOISY 会拖慢仿真，定位完及时调回
-> - [ ] **未映射告警**：先核实 `.repl` 是否缺外设，再决定是否 `SilenceRange`
-> - [ ] **快照复现**：关键点 `Save`，跨版本注意兼容性
-> - [ ] **反向执行**：仅单核支持，需先 `reverseExecMode true`
-
----
-
 ## 🔗 思考与延伸索引
 
 - [[renode用法]] — 启动模式、Monitor 命令、机器生命周期与 `.resc` 脚本基础

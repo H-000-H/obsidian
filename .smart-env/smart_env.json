@@ -17,9 +17,12 @@
     "folder_exclusions": ""
   },
   "gitignore_exclusions": [
+    ".obsidian/workspace.json",
+    ".smart-env/",
+    "core-plugins.json",
     "/English/"
   ],
-  "gitignore_exclusions_updated_at": 1791395580262,
+  "gitignore_exclusions_updated_at": 1791718873809,
   "language": "en",
   "re_import_wait_time": 13,
   "smart_chat_threads": {

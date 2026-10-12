@@ -124,21 +124,6 @@ adjust_lowmem_bounds();
 
 ---
 
-## ✅ 落地校验清单（Checklist）
-
-> [!SUCCESS] 内存启动流程验证必过
-> - [ ] **全景布局**：认清 lowmem direct map、vmalloc、fixmap、Vectors 四段在 1GB 内的相对位置
-> - [ ] **分界线定位**：确认 `arm_lowmem_limit` 是被 vmalloc/fixmap 从高地址"顶住"压出来的
-> - [ ] **阶段 1**：`setup_processor()` 读 MIDR；主板匹配失败 `dump_machine_table()` 打印并卡死
-> - [ ] **阶段 2**：`early_fixmap_init` / `early_ioremap_init` 搭临时窗口；`parse_early_param` 处理 `mem=`
-> - [ ] **阶段 3**：两次 `adjust_lowmem_bounds()` 之间夹着 `arm_memblock_init` 扣除禁区；`paging_init()` 建 Swapper PGD
-> - [ ] **阶段 4**：`register_restart_handler` 挂 `arm_restart_nb`；`unflatten_device_tree` 解包 FDT
-> - [ ] **阶段 5**：`smp_init_cpus` / `smp_build_mpidr_hash` 压缩稀疏 ID；`hyp_mode_check` 决断 KVM 资格
-> - [ ] **阶段 6**：`reserve_crashkernel` 按 128MB 对齐挖 Kdump；`mdesc->init_early` 交卷给厂商钩子
-> - [ ] **两次重算**：确认第 2 次 `adjust_lowmem_bounds()` 在内存被扣除/移除后执行，页表不越入空洞
-
----
-
 ## 🔗 思考与延伸索引
 
 - [[KERNEL_SET_UP]] — 启动流程主线：head.S 一路到 `start_kernel()` / `setup_arch()`

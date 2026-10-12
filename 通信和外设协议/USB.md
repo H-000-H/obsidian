@@ -464,24 +464,6 @@ $$
 
 ---
 
-## ✅ 落地校验清单（Checklist）
-
-> [!SUCCESS] USB 设备固件/硬件上电前必过
-> - [ ] **上拉与速率**：FS/HS 设备 D+ 挂 $1.5\text{ k}\Omega$，LS 设备挂 D−；未连设备两线均被主机 $15\text{ k}\Omega$ 下拉
-> - [ ] **供电与时序**：VBUS $5\text{ V} \pm 5\%$、双端共地；枚举完成前取电 $\le 100\text{ mA}$，`bMaxPower` 如实上报（单位 2 mA）
-> - [ ] **信号完整性**：D+/D− 差分 $90\ \Omega$ 阻抗、等长成对、换层少；HS 才需严格控制，ESD/共模器件结容量不能超标
-> - [ ] **EP0 正确**：`bMaxPacketSize0` ∈ {8,16,32,64} 且与实际 FIFO 一致；SETUP **无条件接受**且强制 DATA0
-> - [ ] **描述符自检**：各 `bLength` 正确、`wTotalLength` = 实际字节数、多字节小端、结构体 `packed`、字符串 UTF-16LE + LANGID
-> - [ ] **状态机**：复位 → Default（地址 0）→ `SET_ADDRESS` → Addressed → `SET_CONFIGURATION` → Configured；未配置前不响应非 EP0 端点
-> - [ ] **数据翻转**：每个非 SETUP 端点维护 DATA0/DATA1，**仅 ACK 后翻转**；重发不重复翻转
-> - [ ] **流控语义**：暂时没数据/没空间回 **NAK**，永久错误回 **STALL**（并支持 `CLEAR_FEATURE` 解除），别用 NAK 掩盖故障
-> - [ ] **SOF/挂起**：处理 SOF、Suspend（3 ms 无活动）与 Resume；需要时声明并实现远程唤醒
-> - [ ] **类匹配**：`bInterfaceClass/SubClass/Protocol` 三元组与目标驱动一致；复合设备补 IAD（`0x0B`）
-> - [ ] **抓包验证**：`dmesg` + `lsusb -t/-v` 或 Wireshark+usbmon 完整看到枚举序列，四种传输类型分别做压力/短包/边界用例
-> - [ ] **合规**：VID 授权、（量产）USB-IF 电气/协议兼容性测试（眼图、`bMaxPower`、suspend/resume 用例）
-
----
-
 ## 🔗 思考与延伸索引
 
 - [[UART]] — 同为"无时钟线"串行总线：UART 靠约定波特率 + 起始/停止位成帧，USB 靠 NRZI + 位填充 + SYNC/EOP 成帧

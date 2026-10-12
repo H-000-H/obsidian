@@ -733,21 +733,6 @@ void DMA1_Channel_I2C_RX_IRQHandler(void)
 
 ---
 
-## ✅ 落地校验清单（Checklist）
-
-> [!SUCCESS] I²C 驱动上线前必过
-> - [ ] **超时保护**：每个轮询等待都带 timeout，避免总线锁死时死循环
-> - [ ] **地址移位**：7 位地址左移 1 位再加 R/W 位（`dev_addr << 1 | rw`）
-> - [ ] **ADDR 清除**：读 SR1 再读 SR2 才能清 ADDR 标志
-> - [ ] **单字节读**：清 ADDR 前关 ACK + 请求 STOP，防总线锁死
-> - [ ] **多字节读**：倒数第 1 字节前置 NACK
-> - [ ] **中断状态机**：EV 按 SB→ADDR→TXE/BTF/RXNE 推进，ER 处理 AF/BERR
-> - [ ] **DMA LAST 位**：接收 len>1 时使能，自动在末字节产生 NACK
-> - [ ] **DMA 收尾**：发送完成等 BTF 再 STOP，勿在 TCIF 立即停
-> - [ ] **总线恢复**：从机异常拉低 SDA 时发 9 个 SCL 脉冲 + STOP 解锁
-
----
-
 ## 🔗 思考与延伸索引
 
 - [[I2C]] — I²C 协议层总览：帧格式、仲裁、Clock Stretching

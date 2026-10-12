@@ -294,23 +294,6 @@ testssl.sh --defaults host
 
 ---
 
-## ✅ 落地校验清单（Checklist）
-
-> [!SUCCESS] TLS 服务/客户端上线前必过
-> - [ ] **版本**：服务端最低 TLS 1.2，优先只开 1.3（+1.2 兼容）；禁用 SSL3/TLS1.0/1.1
-> - [ ] **套件**：只保留 AEAD（`TLS_AES_128_GCM_SHA256` 等 / 1.2 仅 ECDHE-*-GCM），顺序 PFS 优先
-> - [ ] **证书链**：`openssl s_client -showcerts` 全链完整；SAN 覆盖所有域名；`--add-CA` 验证内部根
-> - [ ] **吊销**：启用 OCSP Stapling；CRL 不可达策略明确
-> - [ ] **域名匹配**：证书 SAN 与 SNI 一致；多租户反代每 host 配证书
-> - [ ] **ALPN**：h2/h3 期望值已配置（`no_application_protocol` 检查项）
-> - [ ] **时钟**：嵌入式设备校时（SNTP）或首连容错窗口，RTC 掉电有备份
-> - [ ] **会话恢复**：ticket 密钥定期轮换（≤ 证书周期）；0-RTT 仅幂等请求
-> - [ ] **中间件兼容**：负载均衡/防火墙不做 TLS 解密（或已知其版本支持范围）
-> - [ ] **密钥**：私钥权限 600、不进镜像仓库；IoT 设备一机一密/安全元素存储
-> - [ ] **监控**：过期提醒提前 ≥30 天；记录握手失败率与 alert 码
-
----
-
 ## 🔗 思考与延伸索引
 
 - [[http]] — HTTPS = HTTP over TLS；h2/h3 与 0-RTT 的交互

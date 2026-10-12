@@ -205,20 +205,6 @@ __attribute__((constructor(300))) void adc_driver_init(void);  /* 后跑 */
 
 ---
 
-## ✅ 落地校验清单（Checklist）
-
-> [!SUCCESS] 写面向对象 C 前逐条核对
-> - [ ] **vtable 用 const**：`ops` 表声明为 `static const`，进 Flash、防篡改
-> - [ ] **指定初始化器**：填表用 `.open = ...`，字段顺序变动不出错
-> - [ ] **container_of 前提**：确认 member 确实在 type 内，偏移计算正确
-> - [ ] **内嵌布局**：设备结构体内嵌在驱动私有结构开头，简化反推
-> - [ ] **错误指针**：返回指针的函数失败用 `ERR_PTR(-Exxx)`，调用方 `IS_ERR` 检查
-> - [ ] **不忽略返回值**：`WARN_UNUSED_RESULT` 的错误码必须检查，不吞错
-> - [ ] **静态注册**：设备表编译期定长，不运行时 `malloc`
-> - [ ] **初始化次序**：用 `constructor(N)` / `pre_execution(priority)` 编排，勿手排
-
----
-
 ## 🔗 思考与延伸索引
 
 - [[嵌入式内核]] — 带类型检查的 `container_of` 内核版、位图调度、优先级继承

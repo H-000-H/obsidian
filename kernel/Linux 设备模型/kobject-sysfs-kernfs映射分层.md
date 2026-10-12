@@ -26,7 +26,7 @@ arch: generic
 > [!INFO] 笔记概览
 > - **定位**：梳理 Linux 设备模型的**地基**——`kobject` 作为"原子"如何经 `sysfs` 映射成 `kernfs` 目录树，以及 `kset` / `device` / `class` / `bus` 如何在此之上叠语义。它是理解 `/sys`、`/dev`、udev 与容器命名空间隔离的前置。
 > - **内容范围**：三层全景 · `kobject` 原子与生命周期 · 嵌入 vs 裸（`ktype->release`）· `kobject ↔ kernfs_node` 双向链接 · 目录生成（parent vs kset）· 顶层组织者四变体 · sysfs 命名空间（`kobj_ns`）· `/sys` vs `/dev` 两张脸 · 真机实例
-> - **推荐路径**：§1 三层全景 → §2 `kobject` 原子 → §4 映射双向链接 → §5 目录生成（核心）→ §6 组织者变体 → §7 命名空间 → §8 `/sys` vs `/dev` → §11 Checklist
+> - **推荐路径**：§1 三层全景 → §2 `kobject` 原子 → §4 映射双向链接 → §5 目录生成（核心）→ §6 组织者变体 → §7 命名空间 → §8 `/sys` vs `/dev`
 > - 本文所有结论均对照本仓库源码核实，格式为 `文件:行号`。
 
 相关笔记：[[init.main.c]] · [[ARM Kernel head.S 内核启动 学习笔记]] · [[kernel mm视图]]
@@ -304,21 +304,6 @@ if (dev->class && dev->class->namespace)
 | "网卡能在 `/dev` 找到" | 网络设备**无** `/dev` 节点，走 socket | net 子系统 |
 | "grab 会顺便检查挂载权限" | grab 是**无策略原语**，准入由 `may_mount` 在挂载处单独查 | `fs/sysfs/mount.c:47/55` |
 | "`hpage_pmd_size` 是 x86 专属" | 4KB 基页下 x86-64 与 arm64 的 PMD 块都是 2MB | `include/linux/huge_mm.h` |
-
----
-
-## ✅ 落地校验清单（Checklist）
-
-> [!SUCCESS] 设备模型地基验证必过
-> - [ ] **三层**：能说清 kernfs_node(结构核心) / sysfs(桥) / kobject(设备模型原子) 的职责
-> - [ ] **生命周期**：背出 `init→add→rename→del→put→release→cleanup` 与 `state_*` 记账字段
-> - [ ] **嵌入 vs 裸**：解释 `ktype->release` 是唯一接缝（`container_of` 释放外层 vs `kfree(kobj)`）
-> - [ ] **双向链接**：说出 `kobj->sd` / `kn->priv` / `kn->ns` 三者关系与来源
-> - [ ] **目录生成**：讲清 `kobject_add_internal` 把 kset 升格为 parent、`sysfs_create_dir_ns` 只认 `parent->sd`/root，及四种组合规则
-> - [ ] **组织者变体**：说明 kset/device/class/bus 都是 kobject/kset + 语义，class 经 `subsys_private` 内含 kset
-> - [ ] **命名空间**：区分 `may_mount`(门禁) 与 `grab/drop`(真实取还引用)；知 ns 标签取自 `class->namespace()`
-> - [ ] **两张脸**：说清 `/sys`(元数据) vs `/dev`(I/O) 及桥(`KOBJ_ADD` uevent + `dev` 属性 + udev)
-> - [ ] **真机对号**：能在 `/sys/kernel/mm/ksm`(裸)、`/sys/class/net`(class+ns)、`/dev`(节点) 上指认原理
 
 ---
 

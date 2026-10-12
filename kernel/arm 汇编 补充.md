@@ -81,16 +81,6 @@ bic r0, r0, #(1 << 2)    ; r0 = r0 & ~立即数
 
 ---
 
-## ✅ 落地校验清单（Checklist）
-
-> [!SUCCESS] 手写/阅读启动汇编前必过
-> - [ ] `mrc`/`mcr` 方向正确（`mrc`=读，`mcr`=写）
-> - [ ] TST 结果与 `ZN` 标志映射正确，`bne`（非 0 跳）vs `beq`（为 0 跳）不混
-> - [ ] `adr` 用于 PIC 相对寻址，`ldrb` 只读单字节到低 8 位
-> - [ ] 移位结果是否影响 `C` 标志、有无副作用按需确认
-
----
-
 ## 📚 参考资料
 
 1. ARM Assembly Language — `adr`/`ldrb`/`tst` 指令语义（ARMv7-A/R ARM 手册）.

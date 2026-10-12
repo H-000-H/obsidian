@@ -563,22 +563,6 @@ flowchart TD
 
 ---
 
-## ✅ 落地校验清单（Checklist）
-
-> [!SUCCESS] `setup_arch()` 流程读通/调优前必过
-> - [ ] **执行序**：能按 `setup.c:1127-1227` 的 31 步逐行说出每步作用，含 10 处"常见文档漏掉的"步骤（init_mm 填边界、`setup_initial_init_mm`、`early_mm_init`、`setup_dma_zone` 等）
-> - [ ] **768MB 生死线**：懂得用 `VMALLOC_END − PAGE_OFFSET − vmalloc(240MB) − VMALLOC_OFFSET(8MB)` 复算 lowmem 上限，能说清默认布局 = 768MB 且随 VMSPLIT / `vmalloc=` 移动
-> - [ ] **原生页表与切分**：讲清 `head.S` 把 `swapper_pg_dir` 装进 TTBR1 后 `paging_init` 全程同一张表原地扩建，无"页表切换"；指出 LPAE 高物理地址才是例外
-> - [ ] **memblock 可用性时刻**：确认 `memblock_set_current_limit()`（`mmu.c:1760`）之前不能碰 memblock、早期 fixmap 只靠 `bm_pte` 静态页
-> - [ ] **向量表与异步 abort**：`devicemaps_init()` 先建 `0xffff0000` 向量表再 `early_abt_enable()`，期间调试只能用 `earlycon`
-> - [ ] **设备树与重启**：`unflatten_device_tree()` 依赖 memblock 可用 + 永久映射（非 slab）；重启回调受 `if (mdesc->restart)` 约束
-> - [ ] **多核钩子条件**：`smp_build_mpidr_hash()` 仅 SMP + `is_smp()`；`hyp_mode_check()` 仅 `!is_smp()`
-> - [ ] **crashkernel 对齐**：自动选址用 `CRASH_ALIGN`(128MB)、显式 `X@Y` 用 `SECTION_SIZE`，上界限制在低段恒等映射 + lowmem 内
-> - [ ] **命名更新**：能确认 7.3 下 `mm_init()` 已更名 `mm_core_init()`（`init/main.c:1232` / `mm/mm_init.c:2643`），分界在 `memblock_free_all()`
-> - [ ] **可观测**：能从串口日志顺序、`memblock_dump_all()`、`/proc/iomem`、`pr_debug`（mpidr_hash / lowmem limit）反推执行是否正常
-
----
-
 ## 🔗 思考与延伸索引
 
 - [[KERNEL_READING_ORDER]] — 上游 doc：阶段 1"启动流程"为何最适合作为第一条阅读线

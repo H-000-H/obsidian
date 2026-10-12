@@ -337,23 +337,6 @@ for (;;) {
 
 ---
 
-## ✅ 落地校验清单（Checklist）
-
-> [!SUCCESS] Socket 服务端上线前必过
-> - [ ] **字节序**：端口/IP 全部 `htons/htonl/inet_pton`，无裸赋值
-> - [ ] **返回值**：每个调用检查 -1；`read` 返回 0 视为对端关闭退出循环
-> - [ ] **errno**：区分 `EAGAIN/EINTR`（重试）与真错误（断连）
-> - [ ] **SIGPIPE**：屏蔽或 `MSG_NOSIGNAL`，防止写半截进程消失
-> - [ ] **整块收发**：`write_all` / 按协议帧长循环 `read`，处理短读短写
-> - [ ] **SO_REUSEADDR**：listen fd 设置，重启不卡 bind
-> - [ ] **TCP_NODELAY**：低时延协议显式关闭 Nagle
-> - [ ] **Keepalive/心跳**：长连接有任一周期间探测，间隔 < 链路 NAT 超时
-> - [ ] **多路复用**：epoll ET 模式已配非阻塞 + 读尽/写尽；accept 循环到 EAGAIN
-> - [ ] **关闭语义**：需要读完再关的用 `shutdown(SHUT_WR)`；fd 所有权唯一
-> - [ ] **半连接队列**：backlog 与 `tcp_max_syn_backlog` 匹配压测预期
-
----
-
 ## 🔗 思考与延伸索引
 
 - [[TCP]] — connect/close 背后真正的状态机、重传与拥塞控制

@@ -64,6 +64,17 @@ kernel: "7.3.0-rc6 (mainline)"
 | --- | --- | --- |
 | [[kernel 中断系统（ARM32）学习笔记]] | `kernel/irq/*`、`arch/arm/kernel/irq.c` | ARM32 中断系统：irq_desc、softirq、tasklet、workqueue、IPI |
 
+### 🧱 设备模型与模块
+
+| 笔记 | 主源码 | 主题 |
+| --- | --- | --- |
+| [[kobject-sysfs-kernfs映射分层]] | `lib/kobject.c`、`fs/sysfs`、`fs/kernfs` | 设备模型地基：kobject ↔ sysfs ↔ kernfs 映射与分层 |
+| [[kobject 与 module_kobject 结构精读]] | `include/linux/kobject.h`、`include/linux/module.h` | kobject/kobj_type/kset/attribute 与 module_kobject/module_attribute |
+| [[struct device 精读]] | `include/linux/device.h` | 设备通用抽象：模型/总线/驱动/PM/DMA/IOMMU/固件节点 |
+| [[platform-resource-mfd 结构精读]] | `include/linux/platform_device.h`、`include/linux/ioport.h`、`include/linux/mfd/core.h` | platform 记录层：resource / platform_device / mfd_cell |
+| [[struct module 精读]] | `include/linux/module.h`、`kernel/module/*` | 模块子系统：struct module 全字段（导出/holders/许可证/ELF 段） |
+| [[file_operations 与字符设备结构精读]] | `include/linux/fs.h`、`include/linux/cdev.h` | 文件 I/O 层：file_operations / cdev 与驱动侧操作对照 |
+
 ### ⚖️ 调度算法
 
 分两套：`linux/` 讲**内核真实实现**，`principle/` 讲**算法原理**。两者均基于 **Linux 7.3.0-rc6**。

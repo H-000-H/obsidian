@@ -465,23 +465,6 @@ Test-DhcpServerv4Failover -ComputerName dhcp01
 
 ---
 
-## ✅ 落地校验清单（Checklist）
-
-> [!SUCCESS] DHCP 上线 / 排错前必过
-> - [ ] **端口与承载**：UDP 67/68 放行；中继↔服务器 67↔67 可达；首个包源端口为 68（RFC 6842）
-> - [ ] **广播域**：客户端子网内有服务器**或**已配 DHCP Relay；确认中继 `giaddr` 对应网段在服务器上有 `subnet`/作用域声明
-> - [ ] **池容量**：`range` 大小 ≥ 终端峰值；排除网关/AP/打印机保留；`InUse / MaxConfigurable` 有余量（>20% 空闲）
-> - [ ] **租期与定时器**：opt 51 合理（办公 8 h–1 d，访客 1–2 h）；opt 58/59 若下发须为 0.5/0.875 的倍数关系
-> - [ ] **参数完整**：opt 1 掩码与网段一致、opt 3 只有一个默认网关方向、opt 6/15/119 DNS 与后缀正确，opt 55 列表覆盖终端需求
-> - [ ] **冲突检测**：`ping-check`/ARP 检查开启；关注被标 `conflict` 的地址与 DECLINE 日志
-> - [ ] **冗余**：Windows 拆分作用域 80/20 或 Kea/ISC Failover M/N（配好 `mclt`、`address-blacklist`、防火墙放行对等 647）
-> - [ ] **多网卡**：`Get-NetIPInterface` 检查 InterfaceMetric 次序，避免双默认网关与不对称路由
-> - [ ] **安全**：接入端口 DHCP Snooping 非信任 + 速率限制，上联 `trust`；绑定表落盘；配合 IP Source Guard / DAInspect
-> - [ ] **兜底认知**：客户端出现 `169.254.x.x` 且无网关 → 问题在"有去无回"，不要去查 DNS
-> - [ ] **可观测**：服务器日志、`Get-DhcpServerv4Statistics`/`kea-admin` 统计、必要时在**客户端 VLAN 内**镜像抓包，用 `bootp.xid` 串会话
-
----
-
 ## 🔗 思考与延伸索引
 
 - [[UDP]] — DHCP 的承载协议：无连接、无重传，因此超时/退避/`xid` 匹配全在应用层实现

@@ -541,25 +541,6 @@ ethtool -k eth0 | grep -i checksum          # 校验和卸载（排除假 bad ch
 
 ---
 
-## ✅ 落地校验清单（Checklist）
-
-> [!SUCCESS] TCP 上线与调优前必过
-> - [ ] **首部与选项**：确认 SYN 中协商 MSS / WS / SACK / TS；`ss -ti` 能看到 `wscale`、`sack`、`rtt`
-> - [ ] **MSS 与 MTU 匹配**：隧道/PPPoE/巨帧环境核对 `MTU - 40 = MSS`，排除 PMTUD 黑洞
-> - [ ] **握手链路**：半连接队列 `tcp_max_syn_backlog`、全连接 `somaxconn` ≥ 应用 `listen(backlog)`
-> - [ ] **SYN Flood 防线**：`tcp_syncookies=1`，并配监控告警 `SYNs to LISTEN sockets dropped`
-> - [ ] **关闭语义正确**：明确谁主动关闭；被动方必须 `close()`，杜绝 CLOSE_WAIT 堆积
-> - [ ] **TIME_WAIT 治理**：优先连接池/长连接，其次 `tcp_tw_reuse`；**禁用** `tcp_tw_recycle`
-> - [ ] **RTO/重传**：初始 RTO 1 s、`tcp_retries2` 与业务超时对齐；重传率（`TcpRetransSegs/TCPOrigDataSent`）< 0.5%
-> - [ ] **Nagle 决策**：小消息 RPC 设 `TCP_NODELAY`（或 `TCP_QUICKACK`），大流量保持默认
-> - [ ] **零窗口观测**：接收侧消费不阻塞，检查 `zero_win_calls`、`sk rmem`、`tcp_rmem` 上限
-> - [ ] **拥塞算法**：按链路特征选择 CUBIC/BBR，压测后固定 `tcp_congestion_control` 并留档
-> - [ ] **保活策略**：`SO_KEEPALIVE` 默认 2 h 不够，跨 LB/NAT 必须做应用层心跳
-> - [ ] **可观测性**：采集 `ss -s` 状态计数、`nstat` 重传/超时、`tcpdump` 采样点，异常可回溯
-> - [ ] **安全边界**：可靠性 ≠ 安全性，完整性/机密性交给 TLS，见 [[HTTP]]
-
----
-
 ## 🔗 思考与延伸索引
 
 - [[UDP]] — 无连接对照：为什么 QUIC 选择在 UDP 上重建 TCP 的可靠性
