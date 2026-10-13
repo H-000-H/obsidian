@@ -115,7 +115,39 @@ cdev_add(&my_cdev, dev, 1);          // 注册到设备号 → VFS 可按 inode 
 
 ---
 
-## 🔗 5. 调用链：从 `open()` 到驱动
+## 🗺️ 5. `cdev_map` / `struct kobj_map`：设备号 → cdev 的注册表
+
+`cdev` 那么小，正是因为"设备号 → cdev"的检索**不在 cdev 里**，而在 `cdev_map` 这张表。它的本体是 `struct kobj_map`（定义在 `drivers/base/map.c:19`，头文件 `kobj_map.h` 只给不透明前向声明）：
+
+```c
+struct kobj_map {
+	struct probe {
+		struct probe *next;       // 同桶链表
+		dev_t dev;                // 起始设备号
+		unsigned long range;      // 覆盖的连续设备号个数（= cdev_add 的 count）
+		struct module *owner;     // 拥有者模块（查找时 try_module_get 钉住）
+		kobj_probe_t *get;        // dev_t → struct kobject*
+		int (*lock)(dev_t, void *);
+		void *data;               // 对 cdev 就是 struct cdev 自己
+	} *probes[255];              // 255 桶，索引 = MAJOR(dev) % 255
+	struct mutex *lock;
+};
+```
+
+- **按主设备号哈希**：桶索引 = `MAJOR(dev) % 255`（`map.c:58`）；桶内链表按 `range` 升序（`map.c:59`），查找取**能覆盖且 range 最窄**的注册（`map.c:108-118`）。
+- **`cdev_add` 注册**：`kobj_map(cdev_map, dev, count, NULL, exact_match, exact_lock, p)`（`fs/char_dev.c:488`），`p`（cdev）作 `data`。
+- **查找**：`kobj_lookup(cdev_map, inode->i_rdev, &idx)`（`char_dev.c:383`）→ `exact_match` 返回 `&cdev->kobj` → `container_of(kobj, struct cdev, kobj)`（`char_dev.c:386`）取回 cdev。
+- **跨主号**：`n = MAJOR(dev+range-1) - MAJOR(dev) + 1`（`map.c:36`）算"范围横跨几个主号"，每个主号建一个 probe 节点塞进对应桶——所以**一个 cdev 可对应多个主号**（常见 count 小则 `n=1`）。
+- **主号定驱动、次号定实例**：不同主号 → 不同 cdev → 不同驱动；次号不同但同主号 → 同一驱动的不同实例（如 `ttyS0`/`ttyS1`）。
+- **`owner` + `try_module_get`**（`map.c:112`）：取对象前钉住模块，防 `rmmod` 卸载 UAF（呼应 [[struct module 精读]]）。
+- **`base_probe` 自动加载**：注册时塞一个覆盖全范围的 catch-all，`get=base_probe` → `request_module("char-major-%d-%d", MAJOR, MINOR)` 再退 `char-major-%d`（`char_dev.c:663-669`）——打开未加载驱动的 `/dev` 节点时自动 `modprobe`。
+
+> [!NOTE] `kmalloc_objs` 不是专用 slab
+> `kobj_map` 里 `kmalloc_objs(struct probe, n)` = `kmalloc(sizeof(struct probe)*n, GFP_KERNEL)`（`slab.h:1136`→`__alloc_objs:1087`），走的是 slab 的**通用 kmalloc 字节桶**，并未为 probe 建专用 `kmem_cache`——因为设备注册是冷路径、次数少、数量可变，不值得。
+
+---
+
+## 🔗 6. 调用链：从 `open()` 到驱动
 
 ```mermaid
 flowchart LR
@@ -131,7 +163,7 @@ flowchart LR
 
 ---
 
-## 🆚 6. 对照：驱动侧的"操作"（`device_driver` / `platform_driver`）
+## 🆚 7. 对照：驱动侧的"操作"（`device_driver` / `platform_driver`）
 
 fops 是"**文件**操作"；驱动器件的另一套"操作"在驱动对象上（`probe/remove/shutdown` 等），属于**记录层**：
 
@@ -158,7 +190,7 @@ struct platform_driver {
 
 ---
 
-## 🔗 7. 相关笔记
+## 🔗 8. 相关笔记
 
 - [[platform-resource-mfd 结构精读]] — 记录层：`platform_device`/`resource`/`mfd_cell`
 - [[struct device 精读]] — `dev_t`/`devt` 与 `/dev` 节点的来源
@@ -167,7 +199,7 @@ struct platform_driver {
 
 ---
 
-## 📚 8. 参考资料
+## 📚 9. 参考资料
 
 1. **Linux Kernel 源码（本仓库 7.3.0-rc6）** — `include/linux/fs.h`（`struct file_operations` `:1919`、`FOP_*` `:1966-1980`、`struct inode_operations` `:1994`）.
 2. **同上** — `include/linux/cdev.h`（`struct cdev` `:14`、`cdev_init/add/del` `:23-35`）、`include/linux/platform_device.h`（`struct platform_driver` `:284`）、`include/linux/device/driver.h`（`struct device_driver` `:100`）.

@@ -155,7 +155,24 @@ flowchart TD
 | `of_node` vs `fwnode` | 前者 DT 专用，后者统一抽象（OF/ACPI） |
 | `bus` vs `class` | 总线管"匹配/probe"，类管"用户态视图/权限/uevent" |
 | `mfd_cell` 在 `device`？ | **不在**——它在 `struct platform_device`（`platform_device.h:44`） |
+- `/sys/devices`：**真实设备本体树，物理拓扑，struct device**（vendor、resource 在这里）
+- `/sys/class`：**功能视角，struct class，软链接**（干什么用）
+- `/sys/bus`：**总线视角，struct bus_type，软链接**（接在哪条总线）
+- `/sys/dev`：**设备号索引（major:minor），软链接**
+- `/sys/module`：**内核代码模块.ko，和硬件设备分开的体系**
 
+> 一句话区分 class /bus/module
+
+- class：**设备是用来干嘛的**（功能）
+- bus：**设备接在哪条总线**（硬件连接）
+- module：**实现驱动的那个内核代码文件 ko**（代码模块）
+
+举例子：USB 网卡
+
+- 物理设备本体：`/sys/devices/usbxxx/xxx`
+- bus 视角：在 `/sys/bus/usb/devices`
+- class 视角：在 `/sys/class/net/eth0`
+- module 视角：驱动代码 `usbnet.ko` → `/sys/module/usbnet`
 ---
 
 ## 🔗 4. 与相邻结构的关系

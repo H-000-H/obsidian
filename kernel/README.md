@@ -66,14 +66,22 @@ kernel: "7.3.0-rc6 (mainline)"
 
 ### 🧱 设备模型与模块
 
+> [!TIP] 一条主线读所有篇
+> Linux 设备/驱动体系翻来覆去就是**四种零件**在组合：**① 描述符/记录**（`struct device`/`cdev`/`module`/`class`/`bus_type`，只登记不干活）· **② 回调/钩子**（`file_operations`/`probe`/`remove`/PM `ops`/module `init`-`exit`，真正干活）· **③ 引擎/管理**（`bus_type` 撮合、`kobj_map`/`cdev_map` 查号、PM core、module loader，把①+②串起来）· **④ 投影到文件**（sysfs/`/sys/class`/`/sys/bus`/属性/udev 建的 `/dev`，给用户态看）。
+> 另一切分：**记录层/前台**（device/bus/class，登记+配对+投影）vs **I/O 层/后台**（cdev+`file_operations`，数据进出）。看任何子系统（usb/i2c/net/mtd…）都是这四件套换皮。
+
 | 笔记 | 主源码 | 主题 |
 | --- | --- | --- |
 | [[kobject-sysfs-kernfs映射分层]] | `lib/kobject.c`、`fs/sysfs`、`fs/kernfs` | 设备模型地基：kobject ↔ sysfs ↔ kernfs 映射与分层 |
+| [[sysfs 目录↔结构体字段对照树]] | 本机 `/sys`、`include/linux/device*.h`、`blkdev.h`、`module.h` | 在**本机真实 `/sys` 目录**上做对照：每目录 = 完整结构体 + 真实目录 + 条目↔字段对照表（devices/class/bus/module/block/dev） |
 | [[kobject 与 module_kobject 结构精读]] | `include/linux/kobject.h`、`include/linux/module.h` | kobject/kobj_type/kset/attribute 与 module_kobject/module_attribute |
 | [[struct device 精读]] | `include/linux/device.h` | 设备通用抽象：模型/总线/驱动/PM/DMA/IOMMU/固件节点 |
+| [[struct bus_type 精读]] | `include/linux/device/bus.h`、`drivers/base/bus.c` | 总线撮合模板：match→probe、模板 vs 实例、IRQ 亲和性 |
+| [[struct class 与设备自动发现]] | `include/linux/device/class.h`、`drivers/base/base.h` | class 视图 + subsys_private + uevent/udev 自动建 /dev 节点、三种"自动"机制 |
+| [[运行时电源管理 runtime PM]] | `include/linux/pm.h`、`drivers/base/power/` | runtime PM：dev_pm_info / /sys/.../power/ / dev_pm_ops / dev_pm_domain(genpd) |
 | [[platform-resource-mfd 结构精读]] | `include/linux/platform_device.h`、`include/linux/ioport.h`、`include/linux/mfd/core.h` | platform 记录层：resource / platform_device / mfd_cell |
 | [[struct module 精读]] | `include/linux/module.h`、`kernel/module/*` | 模块子系统：struct module 全字段（导出/holders/许可证/ELF 段） |
-| [[file_operations 与字符设备结构精读]] | `include/linux/fs.h`、`include/linux/cdev.h` | 文件 I/O 层：file_operations / cdev 与驱动侧操作对照 |
+| [[file_operations 与字符设备结构精读]] | `include/linux/fs.h`、`include/linux/cdev.h`、`drivers/base/map.c` | 文件 I/O 层：file_operations / cdev / kobj_map（dev_t→cdev 注册表） |
 
 ### ⚖️ 调度算法
 

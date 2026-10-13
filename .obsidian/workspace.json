@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "kernel/Linux 设备模型/file_operations 与字符设备结构精读.md",
-                "mode": "preview",
-                "source": true
+                "file": "kernel/Linux 设备模型/sysfs 目录↔结构体字段对照树.md",
+                "mode": "source",
+                "source": false
               },
               "icon": "lucide-file",
-              "title": "file_operations 与字符设备结构精读"
+              "title": "sysfs 目录↔结构体字段对照树"
             }
           }
         ]
@@ -238,10 +238,15 @@
   },
   "active": "526f14c1cc723f47",
   "lastOpenFiles": [
-    "kernel/Linux 设备模型/platform-resource-mfd 结构精读.md",
-    "kernel/Linux 设备模型/file_operations 与字符设备结构精读.md",
+    "kernel/Linux 设备模型/sysfs 六大根目录拓扑.excalidraw",
+    "未命名.canvas",
+    "kernel/Linux 设备模型/sysfs 目录↔结构体字段对照树.md",
+    "Excalidraw/Drawing 2026-10-13 20.02.02.excalidraw.md",
+    "Excalidraw",
     "kernel/Linux 设备模型/kobject 与 module_kobject 结构精读.md",
     "kernel/Linux 设备模型/struct device 精读.md",
+    "kernel/Linux 设备模型/file_operations 与字符设备结构精读.md",
+    "kernel/Linux 设备模型/platform-resource-mfd 结构精读.md",
     "kernel/Linux 设备模型/kobject-sysfs-kernfs映射分层.md",
     "kernel/sh语法.md",
     "kernel/memory/kernel mm视图.md",
@@ -262,9 +267,6 @@
     "kernel/arm 汇编 补充.md",
     "kernel/memory/mmu.c kernel起步.md",
     "kernel/memory/lowmem 与 highmem.md",
-    "kernel/memory/页表预分配 mmu.c.md",
-    "kernel/memory/完成清单.md",
-    "kernel/memory/arm mm init.c.md",
     "kernel/init_main.c",
     "kernel/memory",
     "kernel",
@@ -273,8 +275,6 @@
     "Learning-log/未命名.base",
     "English/未命名",
     "English",
-    "网络协议/协议核心/TLS/TLS.md.tmp.43228.1789977360033",
-    "网络协议/协议核心/FTP.md.tmp.43228.1789977346802",
     "renode-use/笔记.canvas",
     "通信和外设协议/Excalidraw/I2C.svg",
     "通信和外设协议/Excalidraw/SPI.svg",
