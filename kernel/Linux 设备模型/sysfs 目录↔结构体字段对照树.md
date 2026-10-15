@@ -486,7 +486,101 @@ brw-rw----  1 root disk    259, 7  /dev/nvme0n1       ← 块;259:7
 
 ---
 
-## 🕸️ 7. 视图关系
+## 🧾 7. 属性是什么：kernfs 三节点 + 命名组
+
+### 7.1 属性 = 名字 + 权限 + 一对函数（**不是变量**）
+
+```c
+struct attribute {                    // include/linux/sysfs.h:30
+	const char	*name;
+	umode_t		mode;                 // ← 0444 / 0644 / 0200
+};
+struct device_attribute {             // include/linux/device.h:106
+	struct attribute	attr;
+	ssize_t (*show)(struct device *, struct device_attribute *, char *buf);
+	ssize_t (*store)(struct device *, struct device_attribute *, const char *, size_t);
+};
+```
+
+**`cat` 一次 = 调一次 `show()`，`echo` 一次 = 调一次 `store()`。** 内核不暴露变量，只暴露函数。
+
+### 7.2 五大类（看 `ls -l` 权限位就能分类）
+
+| 类别 | 权限指纹 | 干什么 | 真实例子 |
+| --- | --- | --- | --- |
+| ① 身份/描述 | `-r--r--r--` | 静态标识，基本不变 | `vendor` `device` `revision` `label` `ngpio` `base` `address` `modalias` |
+| ② 状态/统计 | `-r--r--r--` | 实时，每次读重新算 | `stat` `inflight` `runtime_status` `operstate` `carrier` `irq` |
+| ③ 配置/参数 | `-rw-r--r--` | 可调 | `mtu` `control` `autosuspend_delay_ms` `enable` `driver_override` |
+| ④ 动作/触发 | `--w-------` | **写了就触发一次**，无可读值 | `bind` `unbind` `rescan` `remove` `reset` `uevent` `export` |
+| ⑤ 二进制大块 | 常为 `-r--r--r--` | 定长二进制（`bin_attribute`） | PCI `resource`、USB `descriptors` |
+
+```bash
+-r--r--r--   → 只读属性（①/②）
+-rw-r--r--   → 可写属性（③）
+--w-------   → 只写属性（④，写了就干一件事）
+lrwxrwxrwx   → 软链接（不是属性）
+drwxr-xr-x   → 子目录（不是属性）
+```
+
+三条铁律：**内容必为文本**（`sysfs_emit`）、**读一次调一次 show（不缓存）**、**一文件一值**。属性还能靠 `is_visible` 动态显隐。
+
+### 7.3 kernfs 只有三种节点
+
+```c
+enum kernfs_node_type {              // include/linux/kernfs.h:100
+	KERNFS_DIR	= 0x0001,     // 目录
+	KERNFS_FILE	= 0x0002,     // 文件
+	KERNFS_LINK	= 0x0004,     // 软链
+};
+struct kernfs_node {                 // kernfs.h:199
+	struct kernfs_node __rcu *__parent;   // :211 父
+	const char __rcu *name;               // :212 ★ 名字
+	unsigned short flags;                 // :218 类型 = DIR/FILE/LINK
+	umode_t mode;                         // :219 权限
+	union {
+		struct kernfs_elem_dir     dir;      // :222 目录：子节点容器(rb树+hash)
+		struct kernfs_elem_symlink symlink;  // :223 软链：目标路径
+		struct kernfs_elem_attr    attr;     // :224 文件：show/store 回调
+	};
+	void *priv;                            // :233 ★★ 指回内核对象（kobject→struct device）
+};
+```
+
+| 节点 | union 成员 | 本质 |
+| --- | --- | --- |
+| **目录** | `dir` | **索引**：子节点的 rb 树 + 哈希，按名字查找 |
+| **文件** | `attr` | **问句**：只有名字 + `show`/`store` 一对回调 |
+| **软链** | `symlink` | **指针**：只有名字 + 目标路径 |
+
+> [!IMPORTANT] **sysfs 里没有任何数据副本**
+> 文件只是"问问题的门"。`cat /sys/class/net/enp55s0/address` → `kernfs_file_fops.read` → `attr.show()` → 读 `net_device->perm_addr` → `sysfs_emit` 成文本。**数据永远在内核结构体里**，靠 `priv`(`:233`) 指回去。这就是"记录层很薄"的最终形态：整个 sysfs 是一棵由"问句"组成的树。
+
+### 7.4 命名组 = 子目录，无名组 = 直接铺
+
+```c
+/* fs/sysfs/group.c: internal_create_group() */
+if (grp->name) {                                        // :151 ★ 有名字
+	kn = kernfs_create_dir_ns(kobj->sd, grp->name, mode, …);   // :176 建子目录
+} else {
+	kn = kobj->sd;                                     // :185 ★ 没名字 → 铺在 kobject 自己目录
+}
+create_files(kn, kobj, uid, gid, grp, update);          // :189
+```
+
+| | 命名组 | 无名组 |
+| --- | --- | --- |
+| 真实例子 | `/sys/module/kvm/sections/`、`parameters/`、`/sys/block/nvme0n1/integrity/` | `gpiochip512` 下的 `base`/`label`/`ngpio` |
+| 目录权限 | 恒 `drwxr-xr-x`（`S_IRWXU\|S_IRUGO\|S_IXUGO`，`:157`） | 无目录 |
+| 能 `cat` 目录? | ❌ 不能（没有 show/store） | — |
+| 整组显隐 | `is_visible`(`:152`) 返回 `SYSFS_GROUP_INVISIBLE` → **整组不建** | 逐个控制 |
+| 卸载 | `sysfs_remove_group`(`:310`)：`remove_files` 后 `kernfs_remove(kn)` 删目录 | 直接 `remove_files` |
+
+> [!WARNING] 命名组 ≠ 新 kobject
+> 命名组只是**同一个 kobject 下的一个 kernfs 目录节点**（无 uevent、不可 cat）；而 `queue/`、`power/`、`mq/` 是**独立的 `struct kobject`**。长得一样，来头不同。
+
+---
+
+## 🕸️ 8. 视图关系
 
 ```mermaid
 flowchart TD
@@ -501,7 +595,7 @@ flowchart TD
 
 ---
 
-## 🔗 8. 相关笔记
+## 🔗 9. 相关笔记
 
 - [[struct device 精读]] · [[struct bus_type 精读]] · [[struct class 与设备自动发现]]
 - [[struct module 精读]] · [[file_operations 与字符设备结构精读]] · [[运行时电源管理 runtime PM]]
@@ -509,7 +603,7 @@ flowchart TD
 
 ---
 
-## 📚 9. 参考资料
+## 📚 10. 参考资料
 
 1. **本机实测** — `/sys`、`/dev` 各目录 `ls`/`ls -l`（本仓库运行环境，mainline 7.3.0-rc6）。
 2. **Linux Kernel 源码** — `include/linux/device.h`（`struct device` `:705`）、`device/bus.h`（`struct bus_type` `:89`）、`device/class.h`（`struct class` `:55`）、`drivers/base/base.h`（`subsys_private` `:43`）、`module.h`（`struct module` `:388`、`module_kobject` `:46`）、`blkdev.h`（`gendisk` `:144`）、`block/genhd.c`（`block_class` `:1488`）、`cdev.h`（`struct cdev` `:22`）、`drivers/base/core.c`（`uevent`、`device_add_class_symlinks`）.

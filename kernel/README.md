@@ -73,11 +73,13 @@ kernel: "7.3.0-rc6 (mainline)"
 | 笔记 | 主源码 | 主题 |
 | --- | --- | --- |
 | [[kobject-sysfs-kernfs映射分层]] | `lib/kobject.c`、`fs/sysfs`、`fs/kernfs` | 设备模型地基：kobject ↔ sysfs ↔ kernfs 映射与分层 |
-| [[sysfs 目录↔结构体字段对照树]] | 本机 `/sys`、`include/linux/device*.h`、`blkdev.h`、`module.h` | 在**本机真实 `/sys` 目录**上做对照：每目录 = 完整结构体 + 真实目录 + 条目↔字段对照表（devices/class/bus/module/block/dev） |
+| [[sysfs 目录↔结构体字段对照树]] | 本机 `/sys`、`include/linux/{device*.h,kernfs.h,sysfs.h}`、`blkdev.h`、`module.h` | 在**本机真实 `/sys` 目录**上做对照：每目录 = 完整结构体 + 真实目录 + 条目↔字段表；外加属性五分类、kernfs 三节点、命名组=子目录 |
 | [[kobject 与 module_kobject 结构精读]] | `include/linux/kobject.h`、`include/linux/module.h` | kobject/kobj_type/kset/attribute 与 module_kobject/module_attribute |
 | [[struct device 精读]] | `include/linux/device.h` | 设备通用抽象：模型/总线/驱动/PM/DMA/IOMMU/固件节点 |
 | [[struct bus_type 精读]] | `include/linux/device/bus.h`、`drivers/base/bus.c` | 总线撮合模板：match→probe、模板 vs 实例、IRQ 亲和性 |
+| [[struct platform_driver 与 probe 时序]] | `include/linux/{init.h,device/driver.h,platform_device.h}`、`init/main.c`、`drivers/base/dd.c`、`drivers/base/platform.c` | 驱动侧另一半：initcall 分级(module_init=level 6→do_initcalls)、device_driver/platform_driver/driver_private、匹配表、两条路径汇合 really_probe、WRITE_ONCE 锁纪律、driver_bound、deferred probe、test_remove/devres 不变式 |
 | [[struct class 与设备自动发现]] | `include/linux/device/class.h`、`drivers/base/base.h` | class 视图 + subsys_private + uevent/udev 自动建 /dev 节点、三种"自动"机制 |
+| [[驱动实战：从裸模块到 platform_driver]] | 本机实测（Ubuntu `7.0.0-38-generic`） | **动手实践**：手写驱动 4 关递进（裸模块 → 字符设备+/dev → 多实例 → platform_driver+假设备）；kbuild 多目录、10 个真机踩坑集、调试工具箱 |
 | [[运行时电源管理 runtime PM]] | `include/linux/pm.h`、`drivers/base/power/` | runtime PM：dev_pm_info / /sys/.../power/ / dev_pm_ops / dev_pm_domain(genpd) |
 | [[platform-resource-mfd 结构精读]] | `include/linux/platform_device.h`、`include/linux/ioport.h`、`include/linux/mfd/core.h` | platform 记录层：resource / platform_device / mfd_cell |
 | [[struct module 精读]] | `include/linux/module.h`、`kernel/module/*` | 模块子系统：struct module 全字段（导出/holders/许可证/ELF 段） |
