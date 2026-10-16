@@ -52,7 +52,7 @@ grep -E '^CONFIG_(ACPI|OF)=' /boot/config-7.0.0-38-generic
 | `dtc`（设备树编译器） | ✅ 已安装 |
 | `arm-linux-gnueabihf-gcc-15` | ✅ ARM32 交叉工具链 |
 | `aarch64-linux-gnu-gcc-15` | ✅ ARM64 交叉工具链 |
-| `~/project/linux-source-code` | **7.3.0-rc6**（笔记基线）已配 ARM32、编过 dtbs；**缺 `zImage`** |
+| `~/project/linux-source-code` | **7.3.0-rc6**（笔记基线）已配 ARM32；`arch/arm/boot/zImage` 34.95 MB + dtbs 均已编好 |
 | `~/project/linux/imx6ull/` | 6.18.37 教学树 + `qume-start.sh`（`-M mcimx6ul-evk -dtb ...`）+ busybox rootfs（NFS/initrd 两种根） |
 
 > [!WARNING] 版本一致性铁律（沿用 [[驱动实战：从裸模块到 platform_driver]] §0.1）
@@ -61,11 +61,12 @@ grep -E '^CONFIG_(ACPI|OF)=' /boot/config-7.0.0-38-generic
 
 ## 4. 实验方案（ARM32 / i.MX6UL，零下载）
 
-**Step 0 补编内核镜像**（当前只有 dtbs，没有 zImage）
+**Step 0 确认 zImage / dtb / 模块同源**（两棵树都已编出 zImage，无需重编）
 
 ```bash
-cd ~/project/linux-source-code
-make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- zImage dtbs -j20
+ls -lh ~/project/linux-source-code/arch/arm/boot/zImage              # 34.95 MB（笔记基线 7.3.0-rc6）
+ls -lh ~/project/linux/imx6ull/linux-source-code/arch/arm/boot/zImage # 10.42 MB（教学树 6.18.37）
+# 铁律：-kernel 的 zImage、-dtb、以及模块 .ko 必须来自同一棵树、同一份 .config
 ```
 
 **Step 1 新建自己的板级 DTS**：`arch/arm/boot/dts/nxp/imx/imx6ul-hello-dt.dts`
