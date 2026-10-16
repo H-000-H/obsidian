@@ -8,7 +8,6 @@ tags:
   - Firmware
   - Script
 status: Completed
-created: 2026-09-20
 ---
 
 # 🖥️ Renode 运行与监控命令完整手册（启动 / Monitor / 机器 / 平台 / 固件 / 脚本）

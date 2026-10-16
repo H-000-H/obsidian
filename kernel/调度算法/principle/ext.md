@@ -8,7 +8,6 @@ tags:
   - extensible-scheduling
   - dsq
 status: Completed
-created: 2026-10-07
 ---
 
 # 🧬 sched_ext 可扩展调度原理（Extensible Scheduler）

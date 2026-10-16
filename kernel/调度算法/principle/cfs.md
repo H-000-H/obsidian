@@ -8,7 +8,6 @@ tags:
   - vruntime
   - fair-scheduling
 status: Completed
-created: 2026-10-06
 ---
 
 # ⚖️ CFS 完全公平调度原理（含 EEVDF 演进）

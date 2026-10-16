@@ -9,7 +9,6 @@ tags:
   - grub
   - bandwidth
 status: Completed
-created: 2026-10-06
 ---
 
 # 🎯 Linux DL（`SCHED_DEADLINE`）实现与注意

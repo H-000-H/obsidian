@@ -9,7 +9,6 @@ tags:
   - scx
   - struct-ops
 status: Completed
-created: 2026-10-07
 ---
 
 # 🧩 Linux sched_ext 实现与注意

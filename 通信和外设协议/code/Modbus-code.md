@@ -10,7 +10,6 @@ tags:
   - Simulation
   - CRC16
 status: Completed
-created: 2026-09-20
 ---
 
 # 🐍 Modbus 协议软件模拟（Python）完整实现手册

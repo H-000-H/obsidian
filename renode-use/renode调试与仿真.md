@@ -8,7 +8,6 @@ tags:
   - Embedded
   - VSCode
 status: Completed
-created: 2026-09-20
 ---
 
 # 🐞 Renode 调试与仿真完整手册（GDB / 单步 / 日志 / 快照 / 反向执行）

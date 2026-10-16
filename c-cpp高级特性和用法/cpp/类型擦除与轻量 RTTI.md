@@ -10,7 +10,6 @@ tags:
   - Teaching
 standard: C++17
 status: Completed
-created: 2026-09-20
 ---
 
 # 🎭 C++ 类型擦除与轻量 RTTI 教学手册

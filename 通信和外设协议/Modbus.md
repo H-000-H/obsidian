@@ -8,7 +8,6 @@ tags:
   - ModbusTCP
   - CRC16
 status: Completed
-created: 2026-09-20
 ---
 
 # 📡 Modbus 通信协议完整技术手册（RTU / ASCII / TCP）

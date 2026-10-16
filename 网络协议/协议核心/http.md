@@ -8,7 +8,6 @@ tags:
   - Web
   - REST
 status: Completed
-created: 2026-09-21
 ---
 
 # 🌐 HTTP 协议完整技术手册

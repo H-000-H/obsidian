@@ -8,7 +8,6 @@ tags:
   - BOOTP
   - Troubleshooting
 status: Completed
-created: 2026-09-21
 ---
 
 # 🔗 DHCP 协议完整技术手册

@@ -11,7 +11,6 @@ tags:
   - mm
   - 源码精读
 status: Completed
-created: 2026-09-22
 kernel: "7.3.0-rc6 (mainline)"
 arch: arm
 upstream-doc: "[[KERNEL_READING_ORDER#阶段 1：启动流程（最适合作为第一条线）]]"

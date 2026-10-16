@@ -10,7 +10,6 @@ tags:
   - Automotive
 standard: "ISO 11898 / Bosch CAN 2.0 & CAN FD"
 status: Completed
-created: 2026-09-20
 ---
 
 # 🚌 CAN 通信协议完整技术手册（经典 CAN 与 CAN-FD）

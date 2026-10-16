@@ -8,7 +8,6 @@ tags:
   - tickless
   - nohz
 status: Completed
-created: 2026-10-06
 ---
 
 # 💤 Linux IDLE 实现与注意

@@ -9,7 +9,6 @@ tags:
   - Bus
 standard: "NXP I2C-bus specification UM10204"
 status: Completed
-created: 2026-09-20
 ---
 
 # 🔗 I²C 通信协议完整技术手册

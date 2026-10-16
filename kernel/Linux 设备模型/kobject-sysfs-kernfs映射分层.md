@@ -16,7 +16,6 @@ tags:
   - device-model
   - namespace
 status: Completed
-created: 2026-10-10
 kernel: "7.3.0-rc6 (mainline)"
 arch: generic
 ---

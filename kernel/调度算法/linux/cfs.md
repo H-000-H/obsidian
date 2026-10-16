@@ -9,7 +9,6 @@ tags:
   - lag
   - cfs-bandwidth
 status: Completed
-created: 2026-10-06
 ---
 
 # ⚖️ Linux CFS/EEVDF 实现与注意

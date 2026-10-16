@@ -9,7 +9,6 @@ tags:
   - Subnetting
   - Fragmentation
 status: Completed
-created: 2026-09-21
 ---
 
 # 🌐 IP 协议完整技术手册（IPv4 / IPv6）

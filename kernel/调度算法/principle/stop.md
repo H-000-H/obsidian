@@ -7,7 +7,6 @@ tags:
   - stop-machine
   - cpu-hotplug
 status: Completed
-created: 2026-10-06
 ---
 
 # 🛑 STOP 调度类原理（停机调度）

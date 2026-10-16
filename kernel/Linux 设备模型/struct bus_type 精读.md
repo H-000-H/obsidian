@@ -13,7 +13,6 @@ tags:
   - bus
   - irq-affinity
 status: Completed
-created: 2026-10-13
 kernel: "7.3.0-rc6 (mainline)"
 arch: generic
 ---

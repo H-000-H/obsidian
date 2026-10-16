@@ -7,7 +7,6 @@ tags:
   - Cryptography
   - HTTPS
 status: Completed
-created: 2026-09-21
 ---
 
 # 🔐 TLS 加密协议完整技术手册（TLS 1.2 / 1.3）

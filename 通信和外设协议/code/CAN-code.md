@@ -10,7 +10,6 @@ tags:
   - BitStuffing
   - Arbitration
 status: Completed
-created: 2026-09-20
 ---
 
 # 🐍 CAN / CAN-FD 协议软件模拟（Python）完整实现手册

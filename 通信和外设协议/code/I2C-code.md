@@ -10,7 +10,6 @@ tags:
   - Python
   - C
 status: Completed
-created: 2026-09-20
 ---
 
 # 🔗 I²C 驱动实现完整手册（Bit-Bang / 轮询 / 中断 / DMA）

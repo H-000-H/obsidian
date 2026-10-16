@@ -9,7 +9,6 @@ tags:
   - iMX6ULL
   - Cortex-A7
 status: Completed
-created: 2026-09-30
 ---
 
 # 🚀 ARM zImage head.S 启动 学习笔记

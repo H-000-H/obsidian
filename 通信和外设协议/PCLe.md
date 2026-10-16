@@ -8,7 +8,6 @@ tags:
   - TLP
   - FlowControl
 status: Completed
-created: 2026-09-21
 ---
 
 # 🖥️ PCIe 总线协议完整技术手册

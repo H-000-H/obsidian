@@ -8,7 +8,6 @@ tags:
   - Index
   - README
 status: Completed
-created: 2026-09-20
 ---
 
 # 📚 C / C++ 高级特性与用法（教学版）

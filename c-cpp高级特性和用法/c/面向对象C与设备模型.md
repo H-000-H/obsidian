@@ -10,7 +10,6 @@ tags:
   - Teaching
 standard: C11 + GNU 扩展
 status: Completed
-created: 2026-09-20
 ---
 
 # 🏗️ 面向对象 C 与设备模型教学手册

@@ -11,7 +11,6 @@ tags:
   - practice
   - kbuild
 status: Completed
-created: 2026-10-15
 kernel: "运行内核 7.0.0-38-generic（Ubuntu，发行版 headers）"
 arch: x86_64
 ---

@@ -11,7 +11,6 @@ tags:
   - Teaching
 standard: C++17
 status: Completed
-created: 2026-09-20
 ---
 
 # 🧬 ETL 类型萃取与 SFINAE 技巧手册

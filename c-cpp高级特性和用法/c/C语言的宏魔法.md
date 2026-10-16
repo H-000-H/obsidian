@@ -10,7 +10,6 @@ tags:
   - Teaching
 standard: C11 + GNU 扩展
 status: Completed
-created: 2026-09-20
 ---
 
 # 🪄 C 语言的宏魔法与编译期技巧教学手册

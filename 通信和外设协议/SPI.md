@@ -8,7 +8,6 @@ tags:
   - Timing
   - Bus
 status: Completed
-created: 2026-09-20
 ---
 
 # 🔌 SPI 通信协议完整技术手册

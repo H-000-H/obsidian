@@ -7,7 +7,6 @@ tags:
   - stop-machine
   - cpu-hotplug
 status: Completed
-created: 2026-10-06
 ---
 
 # 🛑 Linux STOP 实现与注意

@@ -7,7 +7,6 @@ tags:
   - Cache
   - Page-Table
 status: In-progress
-created: 2026-09-30
 kernel: "7.3.0-rc6 (mainline)"
 ---
 

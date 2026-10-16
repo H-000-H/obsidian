@@ -8,7 +8,6 @@ tags:
   - tickless
   - nohz
 status: Completed
-created: 2026-10-06
 ---
 
 # 💤 IDLE 调度类原理（空闲调度）

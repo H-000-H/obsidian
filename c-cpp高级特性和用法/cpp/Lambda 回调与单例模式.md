@@ -9,7 +9,6 @@ tags:
   - Teaching
 standard: C++17
 status: Completed
-created: 2026-09-20
 ---
 
 # 🎣 C++ Lambda、回调与单例模式教学手册

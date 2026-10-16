@@ -9,7 +9,6 @@ tags:
   - CAN
   - Embedded
 status: Completed
-created: 2026-09-20
 ---
 
 # 🎛️ Renode 外设仿真完整手册（UART / GPIO / LED / 按键 / 网络 / CAN）

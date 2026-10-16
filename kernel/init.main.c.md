@@ -14,7 +14,6 @@ tags:
   - initcall
   - 源码精读
 status: Completed
-created: 2026-10-09
 kernel: "7.3.0-rc6 (Baby Opossum Posse)"
 arch: generic
 upstream-doc: "[[KERNEL SET_UP]]"

@@ -10,7 +10,6 @@ tags:
   - Teaching
 standard: C++17
 status: Completed
-created: 2026-09-20
 ---
 
 # 🧰 容器与类型萃取教学手册（零堆嵌入式版）

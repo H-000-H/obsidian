@@ -8,7 +8,6 @@ tags:
   - Memory-Map
   - Embedded
 status: Completed
-created: 2026-09-20
 ---
 
 # 🧩 Renode STM32F4 平台外设清单与地址映射手册

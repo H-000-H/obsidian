@@ -14,7 +14,6 @@ tags:
   - mfd
   - resource
 status: Completed
-created: 2026-10-12
 kernel: "7.3.0-rc6 (mainline)"
 arch: generic
 ---

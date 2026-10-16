@@ -8,7 +8,6 @@ tags:
   - Signal
   - Descriptors
 status: Completed
-created: 2026-09-21
 ---
 
 # 🔌 USB 协议完整技术手册

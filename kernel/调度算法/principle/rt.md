@@ -9,7 +9,6 @@ tags:
   - priority
   - rt-throttling
 status: Completed
-created: 2026-10-07
 ---
 
 # ⚡ RT 实时调度原理（SCHED_FIFO / SCHED_RR）

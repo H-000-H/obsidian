@@ -8,7 +8,6 @@ tags:
   - UDP
   - epoll
 status: Completed
-created: 2026-09-21
 ---
 
 # 🔌 Socket 网络编程完整技术手册（BSD Sockets API）

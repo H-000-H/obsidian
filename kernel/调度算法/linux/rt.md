@@ -9,7 +9,6 @@ tags:
   - rt-throttling
   - push-pull
 status: Completed
-created: 2026-10-07
 ---
 
 # ⚡ Linux RT 实现与注意

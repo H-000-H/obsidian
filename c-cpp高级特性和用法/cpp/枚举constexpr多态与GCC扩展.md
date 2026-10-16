@@ -10,7 +10,6 @@ tags:
   - Teaching
 standard: C++17
 status: Completed
-created: 2026-09-20
 ---
 
 # 🏷️ C++ 作用域枚举、constexpr、多态与 GCC 扩展教学手册

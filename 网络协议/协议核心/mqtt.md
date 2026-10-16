@@ -6,7 +6,6 @@ tags:
   - MQTT
   - IoT
 status: Completed
-created: 2026-09-21
 ---
 
 # 📡 MQTT 协议完整技术手册

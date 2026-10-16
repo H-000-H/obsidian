@@ -10,7 +10,6 @@ tags:
   - Teaching
 standard: C99/C11
 status: Completed
-created: 2026-09-20
 ---
 
 # 📘 C 语言高级用法基础教学手册

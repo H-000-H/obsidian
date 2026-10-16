@@ -9,7 +9,6 @@ tags:
   - grub
   - realtime
 status: Completed
-created: 2026-10-06
 ---
 
 # ⏳ 截止期调度原理（Deadline Scheduling）

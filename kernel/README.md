@@ -8,7 +8,6 @@ tags:
   - meta
   - index
 status: Completed
-created: 2026-10-09
 kernel: "7.3.0-rc6 (mainline)"
 ---
 
@@ -84,6 +83,13 @@ kernel: "7.3.0-rc6 (mainline)"
 | [[platform-resource-mfd 结构精读]] | `include/linux/platform_device.h`、`include/linux/ioport.h`、`include/linux/mfd/core.h` | platform 记录层：resource / platform_device / mfd_cell |
 | [[struct module 精读]] | `include/linux/module.h`、`kernel/module/*` | 模块子系统：struct module 全字段（导出/holders/许可证/ELF 段） |
 | [[file_operations 与字符设备结构精读]] | `include/linux/fs.h`、`include/linux/cdev.h`、`drivers/base/map.c` | 文件 I/O 层：file_operations / cdev / kobj_map（dev_t→cdev 注册表） |
+| [[驱动实战 2：file_operations 补全 · 互斥锁消融实验 · sysfs 属性]] | 本机实测（`7/` `8/`）+ `fs/char_dev.c`、`lib/kobject.c` | **动手实践续**：`裸模块 -> 字符设备+/dev -> 多实例 -> platform_driver+假设备 -> 完整 file_operations -> 互斥锁消融 -> sysfs 属性`；llseek 契约、互斥锁 A/B 消融实验、sysfs 属性/属性组/子目录/可见性 + 11 条踩坑集 |
+
+### 🌳 设备树（DT）
+
+| 笔记 | 主源码 | 主题 |
+| --- | --- | --- |
+| [[设备树（DT）勘察与 QEMU 实验方案]] | `arch/arm/boot/dts/nxp/imx/`、本机 `/boot/config-*` | x86 为何走 ACPI 不用 DT；DT 语法四件套；QEMU ARM32/ARM64 两条路线与本机资源清单；i.MX6UL 实验方案 |
 
 ### ⚖️ 调度算法
 
